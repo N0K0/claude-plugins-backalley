@@ -43,11 +43,16 @@ The root `.claude-plugin/marketplace.json` is the **marketplace registry** — i
 
 ### marketplace.json
 
-Empty but schema-valid. The `$schema` URL is a convention from the official repo (not a fetchable endpoint):
+Empty but schema-valid. The `$schema` URL is a convention from the official repo (not a fetchable endpoint). Includes top-level `name`, `description`, and `owner` fields matching the official repo's format:
 
 ```json
 {
   "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "claude-plugins-backalley",
+  "description": "Private Claude Code plugin marketplace for security tooling and custom integrations",
+  "owner": {
+    "name": "nikolas"
+  },
   "plugins": []
 }
 ```
