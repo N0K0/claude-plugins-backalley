@@ -1,6 +1,28 @@
 import { z } from 'zod';
 import { api } from '../gh.js';
-import { repoParams, paginationParams, type ToolDef } from '../types.js';
+import { repoParams, paginationParams, slim, type ToolDef } from '../types.js';
+
+const PR_FIELDS = ['number', 'title', 'state', 'body', 'head', 'base', 'html_url', 'merged', 'mergeable', 'draft', 'user', 'labels', 'milestone', 'created_at', 'updated_at', 'node_id'];
+const PR_LIST_FIELDS = ['number', 'title', 'state', 'head', 'base', 'html_url', 'draft', 'user', 'labels', 'created_at'];
+
+function slimPr(pr: any) {
+  const result = slim(pr, PR_FIELDS);
+  if (result.head) result.head = { ref: result.head.ref, sha: result.head.sha };
+  if (result.base) result.base = { ref: result.base.ref };
+  if (result.user) result.user = result.user.login ?? result.user;
+  if (result.labels) result.labels = result.labels.map((l: any) => l.name ?? l);
+  if (result.milestone) result.milestone = { number: result.milestone.number, title: result.milestone.title };
+  return result;
+}
+
+function slimPrList(pr: any) {
+  const result = slim(pr, PR_LIST_FIELDS);
+  if (result.head) result.head = { ref: result.head.ref };
+  if (result.base) result.base = { ref: result.base.ref };
+  if (result.user) result.user = result.user.login ?? result.user;
+  if (result.labels) result.labels = result.labels.map((l: any) => l.name ?? l);
+  return result;
+}
 
 export const tools: ToolDef[] = [
   {
@@ -25,7 +47,6 @@ export const tools: ToolDef[] = [
         },
       });
 
-      // Request reviewers separately if specified
       if (args.reviewers?.length) {
         await api(`/repos/${ctx.owner}/${ctx.repo}/pulls/${pr.number}/requested_reviewers`, {
           method: 'POST',
@@ -33,7 +54,7 @@ export const tools: ToolDef[] = [
         });
       }
 
-      return pr;
+      return slimPr(pr);
     },
   },
   {
@@ -53,7 +74,8 @@ export const tools: ToolDef[] = [
       };
       if (args.base) fields.base = args.base;
       if (args.head) fields.head = args.head;
-      return api(`/repos/${ctx.owner}/${ctx.repo}/pulls`, { fields });
+      const result = await api(`/repos/${ctx.owner}/${ctx.repo}/pulls`, { fields });
+      return Array.isArray(result) ? result.map(slimPrList) : result;
     },
   },
   {
@@ -64,7 +86,8 @@ export const tools: ToolDef[] = [
       pr_number: z.number().describe('PR number'),
     }),
     handler: async (args, ctx) => {
-      return api(`/repos/${ctx.owner}/${ctx.repo}/pulls/${args.pr_number}`);
+      const result = await api(`/repos/${ctx.owner}/${ctx.repo}/pulls/${args.pr_number}`);
+      return slimPr(result);
     },
   },
   {
@@ -76,10 +99,11 @@ export const tools: ToolDef[] = [
       merge_method: z.enum(['merge', 'squash', 'rebase']).optional().default('merge').describe('Merge strategy'),
     }),
     handler: async (args, ctx) => {
-      return api(`/repos/${ctx.owner}/${ctx.repo}/pulls/${args.pr_number}/merge`, {
+      const result = await api(`/repos/${ctx.owner}/${ctx.repo}/pulls/${args.pr_number}/merge`, {
         method: 'PUT',
         body: { merge_method: args.merge_method ?? 'merge' },
       });
+      return slim(result, ['sha', 'merged', 'message']);
     },
   },
   {
@@ -91,10 +115,11 @@ export const tools: ToolDef[] = [
       reviewers: z.array(z.string()).describe('Reviewer usernames'),
     }),
     handler: async (args, ctx) => {
-      return api(
+      await api(
         `/repos/${ctx.owner}/${ctx.repo}/pulls/${args.pr_number}/requested_reviewers`,
         { method: 'POST', body: { reviewers: args.reviewers } }
       );
+      return { pr_number: args.pr_number, reviewers_requested: args.reviewers };
     },
   },
 ];

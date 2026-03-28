@@ -1,6 +1,27 @@
 import { z } from 'zod';
 import { api } from '../gh.js';
-import { repoParams, paginationParams, type ToolDef } from '../types.js';
+import { repoParams, paginationParams, slim, type ToolDef } from '../types.js';
+
+const ISSUE_FIELDS = ['number', 'title', 'state', 'body', 'labels', 'milestone', 'assignees', 'html_url', 'created_at', 'updated_at', 'closed_at', 'user', 'node_id'];
+const ISSUE_LIST_FIELDS = ['number', 'title', 'state', 'labels', 'milestone', 'assignees', 'html_url', 'created_at'];
+const COMMENT_FIELDS = ['id', 'body', 'user', 'created_at', 'html_url'];
+
+function slimIssue(issue: any) {
+  const result = slim(issue, ISSUE_FIELDS);
+  if (result.labels) result.labels = result.labels.map((l: any) => l.name ?? l);
+  if (result.milestone) result.milestone = { number: result.milestone.number, title: result.milestone.title };
+  if (result.assignees) result.assignees = result.assignees.map((a: any) => a.login ?? a);
+  if (result.user) result.user = result.user.login ?? result.user;
+  return result;
+}
+
+function slimIssueList(issue: any) {
+  const result = slim(issue, ISSUE_LIST_FIELDS);
+  if (result.labels) result.labels = result.labels.map((l: any) => l.name ?? l);
+  if (result.milestone) result.milestone = { number: result.milestone.number, title: result.milestone.title };
+  if (result.assignees) result.assignees = result.assignees.map((a: any) => a.login ?? a);
+  return result;
+}
 
 export const tools: ToolDef[] = [
   {
@@ -20,10 +41,11 @@ export const tools: ToolDef[] = [
       if (args.labels) body.labels = args.labels;
       if (args.milestone) body.milestone = args.milestone;
       if (args.assignees) body.assignees = args.assignees;
-      return api(`/repos/${ctx.owner}/${ctx.repo}/issues`, {
+      const result = await api(`/repos/${ctx.owner}/${ctx.repo}/issues`, {
         method: 'POST',
         body,
       });
+      return slimIssue(result);
     },
   },
   {
@@ -41,10 +63,11 @@ export const tools: ToolDef[] = [
     }),
     handler: async (args, ctx) => {
       const { issue_number, owner, repo, ...body } = args;
-      return api(`/repos/${ctx.owner}/${ctx.repo}/issues/${issue_number}`, {
+      const result = await api(`/repos/${ctx.owner}/${ctx.repo}/issues/${issue_number}`, {
         method: 'PATCH',
         body,
       });
+      return slimIssue(result);
     },
   },
   {
@@ -55,7 +78,8 @@ export const tools: ToolDef[] = [
       issue_number: z.number().describe('Issue number'),
     }),
     handler: async (args, ctx) => {
-      return api(`/repos/${ctx.owner}/${ctx.repo}/issues/${args.issue_number}`);
+      const result = await api(`/repos/${ctx.owner}/${ctx.repo}/issues/${args.issue_number}`);
+      return slimIssue(result);
     },
   },
   {
@@ -77,7 +101,8 @@ export const tools: ToolDef[] = [
       if (args.labels) fields.labels = args.labels;
       if (args.milestone) fields.milestone = args.milestone;
       if (args.assignee) fields.assignee = args.assignee;
-      return api(`/repos/${ctx.owner}/${ctx.repo}/issues`, { fields });
+      const result = await api(`/repos/${ctx.owner}/${ctx.repo}/issues`, { fields });
+      return Array.isArray(result) ? result.map(slimIssueList) : result;
     },
   },
   {
@@ -90,12 +115,16 @@ export const tools: ToolDef[] = [
     }),
     handler: async (args, ctx) => {
       const fullQuery = `repo:${ctx.owner}/${ctx.repo} ${args.query}`;
-      return api(`/search/issues`, {
+      const result = await api(`/search/issues`, {
         fields: {
           q: fullQuery,
           per_page: String(args.per_page ?? 30),
         },
       });
+      return {
+        total_count: result.total_count,
+        items: result.items?.map(slimIssueList) ?? [],
+      };
     },
   },
   {
@@ -107,10 +136,13 @@ export const tools: ToolDef[] = [
       body: z.string().describe('Comment body (markdown)'),
     }),
     handler: async (args, ctx) => {
-      return api(
+      const result = await api(
         `/repos/${ctx.owner}/${ctx.repo}/issues/${args.issue_number}/comments`,
         { method: 'POST', body: { body: args.body } }
       );
+      const slimmed = slim(result, COMMENT_FIELDS);
+      if (slimmed.user) slimmed.user = slimmed.user.login ?? slimmed.user;
+      return slimmed;
     },
   },
 ];

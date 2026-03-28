@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { api } from '../gh.js';
-import { repoParams, type ToolDef } from '../types.js';
+import { repoParams, slim, type ToolDef } from '../types.js';
+
+const MILESTONE_FIELDS = ['number', 'title', 'description', 'state', 'due_on', 'open_issues', 'closed_issues', 'html_url'];
 
 export const tools: ToolDef[] = [
   {
@@ -16,10 +18,11 @@ export const tools: ToolDef[] = [
       const body: Record<string, unknown> = { title: args.title };
       if (args.description) body.description = args.description;
       if (args.due_on) body.due_on = args.due_on;
-      return api(`/repos/${ctx.owner}/${ctx.repo}/milestones`, {
+      const result = await api(`/repos/${ctx.owner}/${ctx.repo}/milestones`, {
         method: 'POST',
         body,
       });
+      return slim(result, MILESTONE_FIELDS);
     },
   },
   {
@@ -30,9 +33,10 @@ export const tools: ToolDef[] = [
       state: z.enum(['open', 'closed', 'all']).optional().default('open').describe('Filter by state'),
     }),
     handler: async (args, ctx) => {
-      return api(`/repos/${ctx.owner}/${ctx.repo}/milestones`, {
+      const result = await api(`/repos/${ctx.owner}/${ctx.repo}/milestones`, {
         fields: { state: args.state ?? 'open', per_page: '100' },
       });
+      return Array.isArray(result) ? slim(result, MILESTONE_FIELDS) : result;
     },
   },
   {
@@ -48,10 +52,11 @@ export const tools: ToolDef[] = [
     }),
     handler: async (args, ctx) => {
       const { milestone_number, owner, repo, ...body } = args;
-      return api(`/repos/${ctx.owner}/${ctx.repo}/milestones/${milestone_number}`, {
+      const result = await api(`/repos/${ctx.owner}/${ctx.repo}/milestones/${milestone_number}`, {
         method: 'PATCH',
         body,
       });
+      return slim(result, MILESTONE_FIELDS);
     },
   },
 ];
