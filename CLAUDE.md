@@ -62,6 +62,14 @@ The symlink lives at: `~/.claude/plugins/marketplaces/N0K0-claude-plugins-backal
 
 After making changes, run `/reload-plugins` to pick them up.
 
+**Plugin cache:** Claude Code caches plugin files at `~/.claude/plugins/cache/`. `/reload-plugins` reloads metadata but does NOT refresh cached source files. To pick up code changes during development:
+
+```bash
+rm -rf ~/.claude/plugins/cache
+```
+
+Then run `/reload-plugins`. No restart needed.
+
 ## Development Workflow
 
 - Use git worktrees and feature branches for all feature work — never commit directly to main
