@@ -5,5 +5,15 @@
   "owner": {
     "name": "nikolas"
   },
-  "plugins": []
+  "plugins": [
+    {
+      "name": "gh",
+      "description": "MCP server for GitHub CLI — structured tool access to Issues, Projects, PRs, Labels, and Milestones",
+      "author": {
+        "name": "nikolas"
+      },
+      "source": "./plugins/gh",
+      "category": "development"
+    }
+  ]
 }
