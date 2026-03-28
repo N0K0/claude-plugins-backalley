@@ -1,0 +1,9 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "claude-plugins-backalley",
+  "description": "Private Claude Code plugin marketplace for security tooling and custom integrations",
+  "owner": {
+    "name": "nikolas"
+  },
+  "plugins": []
+}
