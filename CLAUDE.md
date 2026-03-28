@@ -44,6 +44,14 @@ Minimum viable plugin: `.claude-plugin/plugin.json`, `README.md`, `LICENSE`.
 - Hook scripts receive JSON on stdin and must emit JSON on stdout
 - MCP servers are configured via `.mcp.json` at the plugin root
 
+## Development Workflow
+
+- Use git worktrees and feature branches for all feature work — never commit directly to main
+- Specs go in GitHub Issues (label: `spec`)
+- Implementation plans can temporarily live in the repo (`docs/superpowers/plans/`)
+- When a plan is fully implemented, create a pull request
+- PRs are reviewed by both Claude Code review skills and the user before merging
+
 ## Reference
 
 - Official repo: `~/git/claude-plugins-official`
