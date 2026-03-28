@@ -1,0 +1,9 @@
+{
+  "name": "gh",
+  "description": "MCP server for GitHub CLI — structured tool access to Issues, Projects, PRs, Labels, and Milestones",
+  "author": {
+    "name": "nikolas"
+  },
+  "version": "0.1.0",
+  "keywords": ["github", "issues", "projects", "pull-requests", "mcp"]
+}
