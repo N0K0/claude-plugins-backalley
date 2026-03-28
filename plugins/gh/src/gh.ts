@@ -105,13 +105,15 @@ export async function graphql(
  * Resolve repo context: use provided owner/repo or fall back to defaults.
  */
 export function resolveRepo(
-  defaults: GhContext,
+  defaults: GhContext | null,
   opts?: GhOptions
 ): GhContext {
-  return {
-    owner: opts?.owner ?? defaults.owner,
-    repo: opts?.repo ?? defaults.repo,
-  };
+  const owner = opts?.owner ?? defaults?.owner;
+  const repo = opts?.repo ?? defaults?.repo;
+  if (!owner || !repo) {
+    throw new Error('No repo detected. Provide owner and repo parameters explicitly.');
+  }
+  return { owner, repo };
 }
 
 // --- Internal helpers ---

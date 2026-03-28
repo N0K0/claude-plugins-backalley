@@ -28,8 +28,13 @@ const allTools: ToolDef[] = [
 
 // --- Startup ---
 await checkGh();
-const defaultRepo: GhContext = await detectRepo();
-process.stderr.write(`gh plugin: detected repo ${defaultRepo.owner}/${defaultRepo.repo}\n`);
+let defaultRepo: GhContext | null = null;
+try {
+  defaultRepo = await detectRepo();
+  process.stderr.write(`gh plugin: detected repo ${defaultRepo.owner}/${defaultRepo.repo}\n`);
+} catch {
+  process.stderr.write(`gh plugin: no git repo detected in cwd, tools require explicit owner/repo\n`);
+}
 
 // --- MCP Server ---
 const server = new Server(
