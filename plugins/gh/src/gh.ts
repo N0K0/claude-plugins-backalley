@@ -59,8 +59,11 @@ export async function api(
 ): Promise<any> {
   const args = ['api', endpoint];
 
-  if (opts.method) {
-    args.push('--method', opts.method);
+  // gh api defaults to POST when -f fields are present.
+  // For read operations (no explicit method, no body), force GET.
+  const method = opts.method ?? (opts.fields && !opts.body ? 'GET' : undefined);
+  if (method) {
+    args.push('--method', method);
   }
 
   if (opts.fields) {
