@@ -44,6 +44,24 @@ Minimum viable plugin: `.claude-plugin/plugin.json`, `README.md`, `LICENSE`.
 - Hook scripts receive JSON on stdin and must emit JSON on stdout
 - MCP servers are configured via `.mcp.json` at the plugin root
 
+## MCP Server Gotchas
+
+**Working directory is NOT the user's project.** When Claude Code launches an MCP server, `${CLAUDE_PLUGIN_ROOT}` resolves to the plugin's install path (e.g., `~/.claude/plugins/marketplaces/.../plugins/<name>/`), not the user's current working directory. This means:
+
+- `gh repo view`, `git` commands, and anything that depends on being inside a git repo will fail
+- File-relative paths resolve to the plugin install dir, not the user's project
+- Any startup logic that assumes a project context must handle the case where there is none
+
+**Design MCP servers to start gracefully without project context.** Auto-detection (like repo detection) should be best-effort — catch failures and fall back to requiring explicit parameters from the user. Never let a missing project context crash the server on startup.
+
+## Marketplace Configuration
+
+For development, the marketplace is configured as a local path symlink rather than a remote git repo. This allows changes to be picked up immediately without pulling.
+
+The symlink lives at: `~/.claude/plugins/marketplaces/N0K0-claude-plugins-backalley` → `/home/nikolas/git/claude-plugins-backalley`
+
+After making changes, run `/reload-plugins` to pick them up.
+
 ## Development Workflow
 
 - Use git worktrees and feature branches for all feature work — never commit directly to main
