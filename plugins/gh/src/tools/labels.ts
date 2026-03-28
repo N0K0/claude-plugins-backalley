@@ -25,7 +25,7 @@ export const tools: ToolDef[] = [
     inputSchema: z.object({
       ...repoParams,
     }),
-    handler: async (args, ctx) => {
+    handler: async (_args, ctx) => {
       return api(`/repos/${ctx.owner}/${ctx.repo}/labels`, {
         fields: { per_page: '100' },
       });
