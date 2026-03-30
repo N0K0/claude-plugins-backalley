@@ -6,7 +6,9 @@ import {
   CallToolRequestSchema,
 } from '@modelcontextprotocol/sdk/types.js';
 import { zodToJsonSchema } from 'zod-to-json-schema';
-import { checkGh, detectRepo, resolveRepo } from './gh.js';
+import { checkGh, resolveRepo } from './gh.js';
+import { getDefaultRepo } from './state.js';
+import { tools as repoTools } from './tools/repo.js';
 import type { GhContext } from './gh.js';
 import type { ToolDef } from './types.js';
 
@@ -24,17 +26,11 @@ const allTools: ToolDef[] = [
   ...milestoneTools,
   ...projectTools,
   ...prTools,
+  ...repoTools,
 ];
 
 // --- Startup ---
 await checkGh();
-let defaultRepo: GhContext | null = null;
-try {
-  defaultRepo = await detectRepo();
-  process.stderr.write(`gh plugin: detected repo ${defaultRepo.owner}/${defaultRepo.repo}\n`);
-} catch {
-  process.stderr.write(`gh plugin: no git repo detected in cwd, tools require explicit owner/repo\n`);
-}
 
 // --- MCP Server ---
 const server = new Server(
@@ -58,7 +54,14 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
 
   try {
     const args = tool.inputSchema.parse(req.params.arguments ?? {});
-    const ctx = resolveRepo(defaultRepo, args);
+
+    // detect_repo establishes context — it doesn't need resolveRepo()
+    if (tool.name === 'detect_repo') {
+      const result = await tool.handler(args, {} as GhContext);
+      return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+    }
+
+    const ctx = resolveRepo(getDefaultRepo(), args);
     const result = await tool.handler(args, ctx);
     return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
   } catch (err: any) {
