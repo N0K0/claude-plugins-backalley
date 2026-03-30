@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { api } from '../gh.js';
 import { repoParams, paginationParams, slim, type ToolDef } from '../types.js';
 import { mkdir } from 'node:fs/promises';
-import { serializeIssue, issueFilePath } from './issue-files.js';
+import { serializeIssue, parseIssueFile, issueFilePath, resolveIssuePaths } from './issue-files.js';
 
 const ISSUE_FIELDS = ['number', 'title', 'state', 'body', 'labels', 'milestone', 'assignees', 'html_url', 'created_at', 'updated_at', 'closed_at', 'user', 'node_id'];
 const ISSUE_LIST_FIELDS = ['number', 'title', 'state', 'labels', 'milestone', 'assignees', 'html_url', 'created_at'];
@@ -199,6 +199,53 @@ export const tools: ToolDef[] = [
       }
 
       return { path: args.path, files };
+    },
+  },
+  {
+    name: 'issue_push',
+    description: 'Push local markdown issue file(s) back to GitHub, updating title, state, labels, milestone, assignees, and body',
+    inputSchema: z.object({
+      ...repoParams,
+      path: z.string().describe('Path to a markdown file or directory of issue files'),
+    }),
+    handler: async (args, ctx) => {
+      const paths = await resolveIssuePaths(args.path);
+      const results: any[] = [];
+      const errors: any[] = [];
+
+      for (const filePath of paths) {
+        try {
+          const content = await Bun.file(filePath).text();
+          const { frontmatter, body } = parseIssueFile(content);
+
+          const patchBody: Record<string, unknown> = {
+            title: frontmatter.title,
+            state: frontmatter.state,
+            labels: frontmatter.labels,
+            milestone: frontmatter.milestone,
+            assignees: frontmatter.assignees,
+            body,
+          };
+
+          const result = await api(
+            `/repos/${ctx.owner}/${ctx.repo}/issues/${frontmatter.number}`,
+            { method: 'PATCH', body: patchBody },
+          );
+
+          results.push({
+            number: result.number,
+            title: result.title,
+            html_url: result.html_url,
+          });
+        } catch (err: any) {
+          errors.push({
+            file: filePath.split('/').pop(),
+            error: err.message,
+          });
+        }
+      }
+
+      return errors.length > 0 ? { results, errors } : { results };
     },
   },
 ];
