@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { api } from '../gh.js';
 import { repoParams, paginationParams, slim, type ToolDef } from '../types.js';
+import { mkdir } from 'node:fs/promises';
+import { serializeIssue, issueFilePath } from './issue-files.js';
 
 const ISSUE_FIELDS = ['number', 'title', 'state', 'body', 'labels', 'milestone', 'assignees', 'html_url', 'created_at', 'updated_at', 'closed_at', 'user', 'node_id'];
 const ISSUE_LIST_FIELDS = ['number', 'title', 'state', 'labels', 'milestone', 'assignees', 'html_url', 'created_at'];
@@ -143,6 +145,60 @@ export const tools: ToolDef[] = [
       const slimmed = slim(result, COMMENT_FIELDS);
       if (slimmed.user) slimmed.user = slimmed.user.login ?? slimmed.user;
       return slimmed;
+    },
+  },
+  {
+    name: 'issue_pull',
+    description: 'Pull GitHub issues to local markdown files with YAML frontmatter for token-efficient editing',
+    inputSchema: z.object({
+      ...repoParams,
+      issue_number: z.number().optional().describe('Pull a single issue'),
+      labels: z.string().optional().describe('Comma-separated label names'),
+      state: z.enum(['open', 'closed', 'all']).optional().default('open').describe('Filter by state'),
+      milestone: z.string().optional().describe('Milestone number, "*", or "none"'),
+      assignee: z.string().optional().describe('Username or "none"'),
+      path: z.string().describe('Absolute path to output directory'),
+    }),
+    handler: async (args, ctx) => {
+      await mkdir(args.path, { recursive: true });
+
+      let issues: any[];
+
+      if (args.issue_number) {
+        // Single issue fetch
+        const issue = await api(`/repos/${ctx.owner}/${ctx.repo}/issues/${args.issue_number}`);
+        issues = [issue];
+      } else {
+        // Bulk fetch with pagination
+        issues = [];
+        let page = 1;
+        while (true) {
+          const fields: Record<string, string> = {
+            state: args.state ?? 'open',
+            per_page: '100',
+            page: String(page),
+          };
+          if (args.labels) fields.labels = args.labels;
+          if (args.milestone) fields.milestone = args.milestone;
+          if (args.assignee) fields.assignee = args.assignee;
+
+          const batch = await api(`/repos/${ctx.owner}/${ctx.repo}/issues`, { fields });
+          if (!Array.isArray(batch) || batch.length === 0) break;
+          issues.push(...batch);
+          if (batch.length < 100) break;
+          page++;
+        }
+      }
+
+      const files = [];
+      for (const issue of issues) {
+        const filePath = issueFilePath(args.path, issue.number);
+        const content = serializeIssue(issue);
+        await Bun.write(filePath, content);
+        files.push({ path: filePath, number: issue.number, title: issue.title });
+      }
+
+      return { path: args.path, files };
     },
   },
 ];
