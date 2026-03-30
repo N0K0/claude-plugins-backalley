@@ -22,7 +22,7 @@ export interface ParsedIssueFile {
 
 /** Build the file path for an issue in a directory */
 export function issueFilePath(dir: string, number: number): string {
-  return `${dir}/issue-${number}.md`;
+  return join(dir, `issue-${number}.md`);
 }
 
 /**
@@ -57,7 +57,7 @@ export function parseIssueFile(content: string): ParsedIssueFile {
   }
 
   const frontmatter = parse(match[1]) as IssueFrontmatter;
-  if (!frontmatter.number) {
+  if (typeof frontmatter.number !== 'number') {
     throw new Error('Invalid issue file: missing "number" in frontmatter');
   }
 

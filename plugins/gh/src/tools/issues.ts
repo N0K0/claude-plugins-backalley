@@ -190,6 +190,9 @@ export const tools: ToolDef[] = [
         }
       }
 
+      // Filter out pull requests (GitHub Issues API returns PRs too)
+      issues = issues.filter((i: any) => !i.pull_request);
+
       const files = [];
       for (const issue of issues) {
         const filePath = issueFilePath(args.path, issue.number);
@@ -258,76 +261,84 @@ export const tools: ToolDef[] = [
     handler: async (args, ctx) => {
       const paths = await resolveIssuePaths(args.path);
       const diffs: any[] = [];
+      const errors: any[] = [];
 
       for (const filePath of paths) {
-        const content = await Bun.file(filePath).text();
-        const { frontmatter, body } = parseIssueFile(content);
+        try {
+          const content = await Bun.file(filePath).text();
+          const { frontmatter, body } = parseIssueFile(content);
 
-        const remote = await api(`/repos/${ctx.owner}/${ctx.repo}/issues/${frontmatter.number}`);
+          const remote = await api(`/repos/${ctx.owner}/${ctx.repo}/issues/${frontmatter.number}`);
 
-        // Compare frontmatter fields
-        const changes: string[] = [];
-        const remoteLabels = (remote.labels ?? []).map((l: any) => l.name ?? l) as string[];
-        const remoteMilestone = remote.milestone?.number ?? null;
-        const remoteAssignees = (remote.assignees ?? []).map((a: any) => a.login ?? a) as string[];
+          // Compare frontmatter fields
+          const changes: string[] = [];
+          const remoteLabels = (remote.labels ?? []).map((l: any) => l.name ?? l) as string[];
+          const remoteMilestone = remote.milestone?.number ?? null;
+          const remoteAssignees = (remote.assignees ?? []).map((a: any) => a.login ?? a) as string[];
 
-        if (remote.title !== frontmatter.title) {
-          changes.push(`title: "${remote.title}" → "${frontmatter.title}"`);
+          if (remote.title !== frontmatter.title) {
+            changes.push(`title: "${remote.title}" → "${frontmatter.title}"`);
+          }
+          if (remote.state !== frontmatter.state) {
+            changes.push(`state: ${remote.state} → ${frontmatter.state}`);
+          }
+
+          // Label diff
+          const addedLabels = frontmatter.labels.filter(l => !remoteLabels.includes(l));
+          const removedLabels = remoteLabels.filter(l => !frontmatter.labels.includes(l));
+          if (addedLabels.length || removedLabels.length) {
+            const parts: string[] = [];
+            if (addedLabels.length) parts.push(addedLabels.map(l => `+${l}`).join(' '));
+            if (removedLabels.length) parts.push(removedLabels.map(l => `-${l}`).join(' '));
+            changes.push(`labels: ${parts.join(' ')}`);
+          }
+
+          if (remoteMilestone !== frontmatter.milestone) {
+            changes.push(`milestone: ${remoteMilestone} → ${frontmatter.milestone}`);
+          }
+
+          const addedAssignees = frontmatter.assignees.filter(a => !remoteAssignees.includes(a));
+          const removedAssignees = remoteAssignees.filter(a => !frontmatter.assignees.includes(a));
+          if (addedAssignees.length || removedAssignees.length) {
+            const parts: string[] = [];
+            if (addedAssignees.length) parts.push(addedAssignees.map(a => `+${a}`).join(' '));
+            if (removedAssignees.length) parts.push(removedAssignees.map(a => `-${a}`).join(' '));
+            changes.push(`assignees: ${parts.join(' ')}`);
+          }
+
+          // Body diff
+          const remoteBody = remote.body ?? '';
+          const bodyDiff = unifiedDiff(
+            remoteBody,
+            body,
+            `a/issue-${frontmatter.number} (remote)`,
+            `b/issue-${frontmatter.number} (local)`,
+          );
+
+          // Remote newer check
+          const remoteNewer = frontmatter.pulled_at
+            ? new Date(remote.updated_at) > new Date(frontmatter.pulled_at)
+            : false;
+
+          const status = (changes.length > 0 || bodyDiff !== null) ? 'modified' : 'up_to_date';
+
+          diffs.push({
+            number: frontmatter.number,
+            title: frontmatter.title,
+            status,
+            changes,
+            body_diff: bodyDiff,
+            remote_newer: remoteNewer,
+          });
+        } catch (err: any) {
+          errors.push({
+            file: filePath.split('/').pop(),
+            error: err.message,
+          });
         }
-        if (remote.state !== frontmatter.state) {
-          changes.push(`state: ${remote.state} → ${frontmatter.state}`);
-        }
-
-        // Label diff
-        const addedLabels = frontmatter.labels.filter(l => !remoteLabels.includes(l));
-        const removedLabels = remoteLabels.filter(l => !frontmatter.labels.includes(l));
-        if (addedLabels.length || removedLabels.length) {
-          const parts: string[] = [];
-          if (addedLabels.length) parts.push(addedLabels.map(l => `+${l}`).join(' '));
-          if (removedLabels.length) parts.push(removedLabels.map(l => `-${l}`).join(' '));
-          changes.push(`labels: ${parts.join(' ')}`);
-        }
-
-        if (remoteMilestone !== frontmatter.milestone) {
-          changes.push(`milestone: ${remoteMilestone} → ${frontmatter.milestone}`);
-        }
-
-        const addedAssignees = frontmatter.assignees.filter(a => !remoteAssignees.includes(a));
-        const removedAssignees = remoteAssignees.filter(a => !frontmatter.assignees.includes(a));
-        if (addedAssignees.length || removedAssignees.length) {
-          const parts: string[] = [];
-          if (addedAssignees.length) parts.push(addedAssignees.map(a => `+${a}`).join(' '));
-          if (removedAssignees.length) parts.push(removedAssignees.map(a => `-${a}`).join(' '));
-          changes.push(`assignees: ${parts.join(' ')}`);
-        }
-
-        // Body diff
-        const remoteBody = remote.body ?? '';
-        const bodyDiff = unifiedDiff(
-          remoteBody,
-          body,
-          `a/issue-${frontmatter.number} (remote)`,
-          `b/issue-${frontmatter.number} (local)`,
-        );
-
-        // Remote newer check
-        const remoteNewer = frontmatter.pulled_at
-          ? new Date(remote.updated_at) > new Date(frontmatter.pulled_at)
-          : false;
-
-        const status = (changes.length > 0 || bodyDiff !== null) ? 'modified' : 'up_to_date';
-
-        diffs.push({
-          number: frontmatter.number,
-          title: frontmatter.title,
-          status,
-          changes,
-          body_diff: bodyDiff,
-          remote_newer: remoteNewer,
-        });
       }
 
-      return { diffs };
+      return errors.length > 0 ? { diffs, errors } : { diffs };
     },
   },
 ];
