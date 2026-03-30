@@ -1,6 +1,6 @@
 # gh MCP Plugin
 
-MCP server wrapping the `gh` CLI for use with Claude Code. Exposes 21 tools across Issues, Labels, Milestones, Projects (V2), and Pull Requests.
+MCP server wrapping the `gh` CLI for use with Claude Code. Exposes 24 tools across Issues, Labels, Milestones, Projects (V2), and Pull Requests.
 
 ## Prerequisites
 
@@ -13,7 +13,7 @@ On startup the server detects the current Git repository and uses it as the defa
 
 ## Tools
 
-### Issues (6)
+### Issues (9)
 
 | Tool | Description |
 |------|-------------|
@@ -23,6 +23,9 @@ On startup the server detects the current Git repository and uses it as the defa
 | `issue_list` | List issues with optional filters (state, labels, assignee, milestone) |
 | `issue_search` | Search issues using GitHub search syntax |
 | `issue_comment` | Add a comment to an issue |
+| `issue_pull` | Pull issues to local markdown files with YAML frontmatter for token-efficient editing |
+| `issue_push` | Push local markdown issue file(s) back to GitHub (file or directory) |
+| `issue_diff` | Compare local issue file(s) against GitHub, showing unified diff of changes |
 
 ### Labels (3)
 
