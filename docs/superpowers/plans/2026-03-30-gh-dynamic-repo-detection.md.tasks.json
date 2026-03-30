@@ -1,11 +1,11 @@
 {
   "planPath": "docs/superpowers/plans/2026-03-30-gh-dynamic-repo-detection.md",
   "tasks": [
-    {"id": 1, "subject": "Task 1: Create shared state module (state.ts)", "status": "pending"},
-    {"id": 2, "subject": "Task 2: Thread cwd through exec/execRaw/detectRepo, update resolveRepo error", "status": "pending", "blockedBy": [1]},
-    {"id": 3, "subject": "Task 3: Create detect_repo tool (tools/repo.ts)", "status": "pending", "blockedBy": [1, 2]},
-    {"id": 4, "subject": "Task 4: Update server.ts — remove startup detection, register tool, special-case dispatcher", "status": "pending", "blockedBy": [2, 3]},
-    {"id": 5, "subject": "Task 5: Manual smoke test", "status": "pending", "blockedBy": [4]}
+    {"id": 1, "subject": "Task 1: Create shared state module (state.ts)", "status": "completed"},
+    {"id": 2, "subject": "Task 2: Thread cwd through exec/execRaw/detectRepo, update resolveRepo error", "status": "completed", "blockedBy": [1]},
+    {"id": 3, "subject": "Task 3: Create detect_repo tool (tools/repo.ts)", "status": "completed", "blockedBy": [1, 2]},
+    {"id": 4, "subject": "Task 4: Update server.ts — remove startup detection, register tool, special-case dispatcher", "status": "completed", "blockedBy": [2, 3]},
+    {"id": 5, "subject": "Task 5: Manual smoke test", "status": "completed", "blockedBy": [4]}
   ],
-  "lastUpdated": "2026-03-30T00:00:00Z"
+  "lastUpdated": "2026-03-30T12:00:00Z"
 }
