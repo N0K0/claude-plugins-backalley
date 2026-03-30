@@ -14,19 +14,38 @@ Replace startup detection with a `detect_repo` tool that the agent calls on dema
 
 `server.ts` currently calls `detectRepo()` at startup and caches the result in `defaultRepo`. Remove this call entirely — it runs in the wrong directory and produces incorrect results.
 
-### 2. Add `detect_repo` tool
+### 2. Add shared repo state module
+
+Create `src/state.ts` to hold the cached default repo. This avoids circular dependencies between `server.ts` and `repo.ts`:
+
+```typescript
+let defaultRepo: GhContext | null = null;
+export function getDefaultRepo() { return defaultRepo; }
+export function setDefaultRepo(ctx: GhContext) { defaultRepo = ctx; }
+```
+
+`server.ts` imports `getDefaultRepo()` for use in `resolveRepo()`. The `detect_repo` tool imports `setDefaultRepo()` to cache its result.
+
+### 3. Add `detect_repo` tool
 
 New tool in `src/tools/repo.ts`:
 
 - **Input**: `path` (required string) — absolute path to a directory inside a git repo
+- **Validation**: Rejects relative paths with a clear error
 - **Behavior**: Runs `gh repo view --json owner,name` with `cwd` set to the provided path
 - **Output**: `{ owner, repo, cached: true }` on success
-- **Side effect**: Caches the result as the session default repo
+- **Error cases**:
+  - Path doesn't exist → `"Directory not found: <path>"`
+  - Not a git repo / no GitHub remote → surfaces the `gh` error message
+  - Relative path → `"Path must be absolute, got: <path>"`
+- **Side effect**: Calls `setDefaultRepo()` to cache the result as the session default
 - **Idempotent**: Can be called multiple times to switch repo context
 
-### 3. Modify `detectRepo()` to accept a `cwd` parameter
+The tool uses the standard `ToolDef` shape but is handled specially in `server.ts` — it does not go through `resolveRepo()` since it's the tool that *establishes* the repo context.
 
-In `src/gh.ts`, change `detectRepo()` to accept an optional `cwd` string parameter. When provided, pass it to the `gh` subprocess as the working directory. This keeps the function reusable.
+### 4. Modify `detectRepo()` and `exec()` to accept a `cwd` parameter
+
+In `src/gh.ts`, add an optional `cwd` parameter to both `exec()` and `detectRepo()`. `detectRepo(cwd)` passes it to `exec()`, which passes it to `execRaw()` via `spawn`'s `cwd` option. This keeps the functions reusable.
 
 ### 4. Improve error when no repo context exists
 
@@ -44,9 +63,10 @@ In `resolveRepo()`, when no explicit `owner`/`repo` is provided and no default i
 
 | File | Change |
 |------|--------|
-| `src/server.ts` | Remove startup `detectRepo()` call; import and register `detect_repo` tool |
-| `src/gh.ts` | Add optional `cwd` parameter to `detectRepo()` and pass it through to `execRaw()` |
-| `src/tools/repo.ts` | New file: `detect_repo` tool definition |
+| `src/server.ts` | Remove startup `detectRepo()` call; use `getDefaultRepo()` from state; special-case `detect_repo` in dispatcher (skip `resolveRepo()`) |
+| `src/state.ts` | New file: shared `defaultRepo` state with getter/setter |
+| `src/gh.ts` | Add optional `cwd` parameter to `exec()` and `detectRepo()`, pass through to `execRaw()` via spawn |
+| `src/tools/repo.ts` | New file: `detect_repo` tool definition using `setDefaultRepo()` |
 | `src/types.ts` | No changes |
 
 ## Acceptance Criteria
@@ -57,3 +77,6 @@ In `resolveRepo()`, when no explicit `owner`/`repo` is provided and no default i
 - [ ] Explicit `owner`/`repo` on any tool call still overrides the cached default
 - [ ] Startup no longer runs `detectRepo()` — server starts cleanly regardless of CWD
 - [ ] `detect_repo` can be called multiple times to switch context
+- [ ] `detect_repo` with a relative path returns a clear validation error
+- [ ] `detect_repo` with a non-existent path returns a clear error
+- [ ] `detect_repo` with a path that has no GitHub remote surfaces the `gh` error
