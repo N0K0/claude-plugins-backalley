@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { api } from '../gh.js';
 import { repoParams, paginationParams, slim, type ToolDef } from '../types.js';
 import { mkdir } from 'node:fs/promises';
-import { serializeIssue, parseIssueFile, issueFilePath, resolveIssuePaths } from './issue-files.js';
+import { serializeIssue, parseIssueFile, issueFilePath, resolveIssuePaths, unifiedDiff } from './issue-files.js';
 
 const ISSUE_FIELDS = ['number', 'title', 'state', 'body', 'labels', 'milestone', 'assignees', 'html_url', 'created_at', 'updated_at', 'closed_at', 'user', 'node_id'];
 const ISSUE_LIST_FIELDS = ['number', 'title', 'state', 'labels', 'milestone', 'assignees', 'html_url', 'created_at'];
@@ -246,6 +246,88 @@ export const tools: ToolDef[] = [
       }
 
       return errors.length > 0 ? { results, errors } : { results };
+    },
+  },
+  {
+    name: 'issue_diff',
+    description: 'Compare local issue file(s) against current GitHub state, showing a unified diff of changes',
+    inputSchema: z.object({
+      ...repoParams,
+      path: z.string().describe('Path to a markdown file or directory of issue files'),
+    }),
+    handler: async (args, ctx) => {
+      const paths = await resolveIssuePaths(args.path);
+      const diffs: any[] = [];
+
+      for (const filePath of paths) {
+        const content = await Bun.file(filePath).text();
+        const { frontmatter, body } = parseIssueFile(content);
+
+        const remote = await api(`/repos/${ctx.owner}/${ctx.repo}/issues/${frontmatter.number}`);
+
+        // Compare frontmatter fields
+        const changes: string[] = [];
+        const remoteLabels = (remote.labels ?? []).map((l: any) => l.name ?? l) as string[];
+        const remoteMilestone = remote.milestone?.number ?? null;
+        const remoteAssignees = (remote.assignees ?? []).map((a: any) => a.login ?? a) as string[];
+
+        if (remote.title !== frontmatter.title) {
+          changes.push(`title: "${remote.title}" → "${frontmatter.title}"`);
+        }
+        if (remote.state !== frontmatter.state) {
+          changes.push(`state: ${remote.state} → ${frontmatter.state}`);
+        }
+
+        // Label diff
+        const addedLabels = frontmatter.labels.filter(l => !remoteLabels.includes(l));
+        const removedLabels = remoteLabels.filter(l => !frontmatter.labels.includes(l));
+        if (addedLabels.length || removedLabels.length) {
+          const parts: string[] = [];
+          if (addedLabels.length) parts.push(addedLabels.map(l => `+${l}`).join(' '));
+          if (removedLabels.length) parts.push(removedLabels.map(l => `-${l}`).join(' '));
+          changes.push(`labels: ${parts.join(' ')}`);
+        }
+
+        if (remoteMilestone !== frontmatter.milestone) {
+          changes.push(`milestone: ${remoteMilestone} → ${frontmatter.milestone}`);
+        }
+
+        const addedAssignees = frontmatter.assignees.filter(a => !remoteAssignees.includes(a));
+        const removedAssignees = remoteAssignees.filter(a => !frontmatter.assignees.includes(a));
+        if (addedAssignees.length || removedAssignees.length) {
+          const parts: string[] = [];
+          if (addedAssignees.length) parts.push(addedAssignees.map(a => `+${a}`).join(' '));
+          if (removedAssignees.length) parts.push(removedAssignees.map(a => `-${a}`).join(' '));
+          changes.push(`assignees: ${parts.join(' ')}`);
+        }
+
+        // Body diff
+        const remoteBody = remote.body ?? '';
+        const bodyDiff = unifiedDiff(
+          remoteBody,
+          body,
+          `a/issue-${frontmatter.number} (remote)`,
+          `b/issue-${frontmatter.number} (local)`,
+        );
+
+        // Remote newer check
+        const remoteNewer = frontmatter.pulled_at
+          ? new Date(remote.updated_at) > new Date(frontmatter.pulled_at)
+          : false;
+
+        const status = (changes.length > 0 || bodyDiff !== null) ? 'modified' : 'up_to_date';
+
+        diffs.push({
+          number: frontmatter.number,
+          title: frontmatter.title,
+          status,
+          changes,
+          body_diff: bodyDiff,
+          remote_newer: remoteNewer,
+        });
+      }
+
+      return { diffs };
     },
   },
 ];
