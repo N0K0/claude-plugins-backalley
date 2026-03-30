@@ -35,6 +35,7 @@ labels:
 milestone: null
 assignees: []
 url: "https://github.com/N0K0/claude-plugins-backalley/issues/11"
+pulled_at: "2026-03-30T17:30:00Z"
 ---
 
 Body content here...
@@ -45,20 +46,21 @@ Body content here...
 - `title`: string
 - `state`: `open` | `closed`
 - `labels`: YAML list of strings
-- `milestone`: integer or null (milestone number, not title)
+- `milestone`: integer or null (milestone number, not title — note: the `issue_pull` *parameter* accepts string values like `"*"` and `"none"` for filtering, matching the GitHub API, but the *frontmatter* field stores the resolved milestone number or null)
 - `assignees`: YAML list of strings (GitHub usernames)
 - `url`: string (html_url, informational — not pushed)
+- `pulled_at`: ISO 8601 timestamp of when the issue was pulled (set by `issue_pull`, used by `issue_diff` to detect remote changes — not pushed)
 
 **File naming:** `{path}/issue-{number}.md`
 
 ## Shared helper module: `src/tools/issue-files.ts`
 
 Exports:
-- `serializeIssue(issue, body)` → markdown string with YAML frontmatter
+- `serializeIssue(raw)` → markdown string with YAML frontmatter. Takes a raw GitHub API issue object (pre-slim) and extracts the needed fields internally.
 - `parseIssueFile(content)` → `{ frontmatter, body }` with typed fields
 - `issueFilePath(dir, number)` → `{dir}/issue-{number}.md`
 
-Uses the `yaml` npm package for both stringify and parse.
+Uses the `yaml` package (`eemeli/yaml`) for both stringify and parse.
 
 ## `issue_pull`
 
@@ -72,6 +74,7 @@ Uses the `yaml` npm package for both stringify and parse.
 | `labels` | string | no | Comma-separated label names |
 | `state` | `open`\|`closed`\|`all` | no | Default: `open` |
 | `milestone` | string | no | Milestone number, `*`, or `none` |
+| `assignee` | string | no | Username or `none` (matches `issue_list`) |
 | `path` | string | yes | Absolute path to output directory |
 
 ### Behavior
@@ -113,7 +116,7 @@ Uses the `yaml` npm package for both stringify and parse.
 
 ### Fields pushed
 
-All frontmatter fields except `number` and `url`:
+All frontmatter fields except `number`, `url`, and `pulled_at`:
 - `title` → API `title`
 - `state` → API `state`
 - `labels` → API `labels` (string array)
@@ -131,12 +134,26 @@ All frontmatter fields except `number` and `url`:
 }
 ```
 
-### Error cases
+### Error handling
 
-- File doesn't exist → error
-- No `number` in frontmatter → error
-- Frontmatter parse failure → error with details
-- API failure → pass through GitHub error message
+- File doesn't exist → error (single-file mode)
+- No `number` in frontmatter → per-file error
+- Frontmatter parse failure → per-file error with details
+- API failure → per-file error, pass through GitHub error message
+- **Directory mode uses continue-on-error**: processes all files, collects errors per-file
+
+### Return value (with errors)
+
+```json
+{
+  "results": [
+    { "number": 11, "title": "Skill: development process", "html_url": "https://..." }
+  ],
+  "errors": [
+    { "file": "issue-99.md", "error": "No number in frontmatter" }
+  ]
+}
+```
 
 ## `issue_diff`
 
@@ -156,8 +173,9 @@ All frontmatter fields except `number` and `url`:
 - Reports per-issue:
   - Changed fields (e.g., `title: "old" → "new"`, `labels: +bug -backlog`)
   - Whether body changed (line count summary)
-  - Whether remote is newer (`remote updated_at > file mtime`) — flags as warning
+  - Whether remote is newer (remote `updated_at` > `pulled_at` from frontmatter) — flags as warning
 - Issues with no local changes reported as "up to date"
+- Body comparison: compare as strings; if different, report the count of added and removed lines
 
 ### Return value
 
@@ -199,7 +217,7 @@ The `remote_newer: true` flag warns that GitHub has changes not reflected locall
 
 ## New dependency
 
-- `yaml` npm package for YAML parse/stringify in frontmatter handling
+- `yaml` (`eemeli/yaml`) npm package for YAML parse/stringify in frontmatter handling
 
 ## Token savings
 
