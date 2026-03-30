@@ -1,3 +1,5 @@
+import { readdir, stat } from 'node:fs/promises';
+import { join } from 'node:path';
 import { stringify, parse } from 'yaml';
 
 /** Frontmatter fields stored in issue markdown files */
@@ -196,4 +198,26 @@ export function unifiedDiff(
   flushHunk();
 
   return lines.join('\n');
+}
+
+/**
+ * Resolve a path (file or directory) into a list of issue markdown file paths.
+ * If path is a file, returns [path].
+ * If path is a directory, returns all issue-*.md files in it.
+ */
+export async function resolveIssuePaths(path: string): Promise<string[]> {
+  const s = await stat(path);
+  if (s.isFile()) return [path];
+  if (s.isDirectory()) {
+    const entries = await readdir(path);
+    return entries
+      .filter(e => /^issue-\d+\.md$/.test(e))
+      .sort((a, b) => {
+        const numA = parseInt(a.match(/issue-(\d+)/)?.[1] ?? '0');
+        const numB = parseInt(b.match(/issue-(\d+)/)?.[1] ?? '0');
+        return numA - numB;
+      })
+      .map(e => join(path, e));
+  }
+  throw new Error(`Path is neither a file nor directory: ${path}`);
 }
