@@ -17,10 +17,10 @@ export interface GhError {
 
 /**
  * Detect current repo from gh CLI.
- * Called once at startup, cached for the session.
+ * @param cwd — directory to detect repo from (must be inside a git repo with a GitHub remote)
  */
-export async function detectRepo(): Promise<GhContext> {
-  const result = await exec(['repo', 'view', '--json', 'owner,name']);
+export async function detectRepo(cwd?: string): Promise<GhContext> {
+  const result = await exec(['repo', 'view', '--json', 'owner,name'], undefined, cwd);
   const owner = result.owner?.login;
   if (!owner) throw new Error('Could not detect repo owner. Are you in a git repo with a GitHub remote?');
   return { owner, repo: result.name };
@@ -114,15 +114,15 @@ export function resolveRepo(
   const owner = opts?.owner ?? defaults?.owner;
   const repo = opts?.repo ?? defaults?.repo;
   if (!owner || !repo) {
-    throw new Error('No repo detected. Provide owner and repo parameters explicitly.');
+    throw new Error('No repository context set. Either pass owner/repo parameters, or call detect_repo with the project path first.');
   }
   return { owner, repo };
 }
 
 // --- Internal helpers ---
 
-async function exec(args: string[], stdin?: string): Promise<any> {
-  const output = await execRaw(args, stdin);
+async function exec(args: string[], stdin?: string, cwd?: string): Promise<any> {
+  const output = await execRaw(args, stdin, cwd);
   try {
     return JSON.parse(output);
   } catch {
@@ -130,11 +130,12 @@ async function exec(args: string[], stdin?: string): Promise<any> {
   }
 }
 
-async function execRaw(args: string[], stdin?: string): Promise<string> {
+async function execRaw(args: string[], stdin?: string, cwd?: string): Promise<string> {
   const proc = spawn(['gh', ...args], {
     stdin: stdin ? new Blob([stdin]) : 'ignore',
     stdout: 'pipe',
     stderr: 'pipe',
+    ...(cwd ? { cwd } : {}),
   });
 
   const stdout = await new Response(proc.stdout).text();
