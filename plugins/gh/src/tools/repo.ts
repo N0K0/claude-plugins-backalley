@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { detectRepo } from '../gh.js';
 import { setDefaultRepo } from '../state.js';
 import type { ToolDef } from '../types.js';
-import { existsSync } from 'node:fs';
+import { existsSync, statSync } from 'node:fs';
 import { isAbsolute } from 'node:path';
 
 export const tools: ToolDef[] = [
@@ -21,6 +21,9 @@ export const tools: ToolDef[] = [
       }
       if (!existsSync(args.path)) {
         throw new Error(`Directory not found: ${args.path}`);
+      }
+      if (!statSync(args.path).isDirectory()) {
+        throw new Error(`Path is not a directory: ${args.path}`);
       }
       const ctx = await detectRepo(args.path);
       setDefaultRepo(ctx);
