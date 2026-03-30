@@ -172,10 +172,10 @@ All frontmatter fields except `number`, `url`, and `pulled_at`:
 - For each file: fetches the current issue from GitHub, compares frontmatter fields and body
 - Reports per-issue:
   - Changed fields (e.g., `title: "old" → "new"`, `labels: +bug -backlog`)
-  - Whether body changed (line count summary)
+  - Body diff in unified format (like `git diff`) so Claude can read exactly what changed
   - Whether remote is newer (remote `updated_at` > `pulled_at` from frontmatter) — flags as warning
 - Issues with no local changes reported as "up to date"
-- Body comparison: compare as strings; if different, report the count of added and removed lines
+- Body comparison: generate a unified diff (remote as `a/`, local as `b/`) using a simple line-based diff algorithm
 
 ### Return value
 
@@ -186,7 +186,8 @@ All frontmatter fields except `number`, `url`, and `pulled_at`:
       "number": 11,
       "title": "Skill: development process",
       "status": "modified",
-      "changes": ["title changed", "labels: +bug", "body: 12 lines changed"],
+      "changes": ["title: \"old\" → \"new\"", "labels: +bug -backlog"],
+      "body_diff": "--- a/issue-11 (remote)\n+++ b/issue-11 (local)\n@@ -5,3 +5,4 @@\n ## Solution\n \n-Old paragraph here.\n+New paragraph here.\n+Added line.\n",
       "remote_newer": false
     },
     {
@@ -194,11 +195,14 @@ All frontmatter fields except `number`, `url`, and `pulled_at`:
       "title": "CVE hunting",
       "status": "up_to_date",
       "changes": [],
+      "body_diff": null,
       "remote_newer": true
     }
   ]
 }
 ```
+
+The `body_diff` field contains a unified diff string (or `null` if body is unchanged). This is the same format as `git diff` output, which Claude can read and reason about directly.
 
 The `remote_newer: true` flag warns that GitHub has changes not reflected locally — pushing would overwrite them.
 
