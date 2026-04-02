@@ -143,6 +143,66 @@ def fix_code_block_spacing(content: str) -> str:
     return "\n".join(result)
 
 
+def fix_heading_spacing(content: str) -> str:
+    """Ensure exactly one blank line before/after headings.
+
+    Exceptions:
+    - No blank line added at file start
+    - YAML frontmatter (--- delimited) is recognized — no extra blank between
+      frontmatter closing --- and the first heading
+    """
+    lines = content.split("\n")
+    regions = find_fenced_regions(content)
+    heading_pattern = re.compile(r"^#{1,6}\s")
+
+    # Detect YAML frontmatter
+    frontmatter_end = -1
+    if lines and lines[0] == "---":
+        for i in range(1, len(lines)):
+            if lines[i] == "---":
+                frontmatter_end = i
+                break
+
+    result = []
+    just_after_heading = False  # True after emitting a heading line
+
+    for i, line in enumerate(lines):
+        if is_in_fenced_region(i, regions):
+            just_after_heading = False
+            result.append(line)
+            continue
+
+        if frontmatter_end >= 0 and i <= frontmatter_end:
+            just_after_heading = False
+            result.append(line)
+            continue
+
+        if heading_pattern.match(line):
+            just_after_heading = False
+            if result:
+                while result and result[-1] == "":
+                    result.pop()
+                # Suppress blank line if previous content line is frontmatter closer
+                if result and not (frontmatter_end >= 0 and result[-1] == "---"):
+                    result.append("")
+            result.append(line)
+            just_after_heading = True
+        elif just_after_heading:
+            if line == "":
+                # Suppress extra blanks after heading; we'll add exactly one
+                # when we encounter the first non-blank line
+                continue
+            else:
+                # First non-blank line after heading: ensure exactly one blank
+                result.append("")
+                result.append(line)
+                just_after_heading = False
+        else:
+            result.append(line)
+
+    return "\n".join(result)
+
+
 def run_pipeline(content: str) -> tuple[str, list[str]]:
     """Run all fixers in order. Returns (fixed_content, list_of_fix_names)."""
     fixes = []
@@ -158,6 +218,6 @@ FIXERS: list[tuple[str, callable]] = [
     # ("table alignment", fix_tables),
     ("trailing whitespace", fix_trailing_whitespace),
     ("code block spacing", fix_code_block_spacing),
-    # ("heading spacing", fix_heading_spacing),
+    ("heading spacing", fix_heading_spacing),
     ("list markers", fix_list_markers),
 ]

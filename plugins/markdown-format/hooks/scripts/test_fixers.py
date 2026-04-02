@@ -5,7 +5,7 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(__file__))
 
-from fixers import find_fenced_regions, fix_trailing_whitespace, fix_list_markers, fix_code_block_spacing
+from fixers import find_fenced_regions, fix_trailing_whitespace, fix_list_markers, fix_code_block_spacing, fix_heading_spacing
 
 
 def test_no_fences():
@@ -121,6 +121,41 @@ def test_tilde_fences_spacing():
 def test_cbs_already_correct():
     text = "text\n\n```\ncode\n```\n\ntext\n"
     assert fix_code_block_spacing(text) == text
+
+
+def test_add_blank_before_heading():
+    text = "text\n## Heading\nmore\n"
+    expected = "text\n\n## Heading\n\nmore\n"
+    assert fix_heading_spacing(text) == expected
+
+def test_hs_no_blank_at_file_start():
+    text = "# Title\ntext\n"
+    expected = "# Title\n\ntext\n"
+    assert fix_heading_spacing(text) == expected
+
+def test_hs_collapse_multiple_blanks():
+    text = "text\n\n\n## Heading\n\n\nmore\n"
+    expected = "text\n\n## Heading\n\nmore\n"
+    assert fix_heading_spacing(text) == expected
+
+def test_frontmatter_no_blank_injected():
+    # Spec: no blank line injected between frontmatter closing --- and first heading
+    text = "---\ntitle: Test\n---\n# Title\ntext\n"
+    expected = "---\ntitle: Test\n---\n# Title\n\ntext\n"
+    assert fix_heading_spacing(text) == expected
+
+def test_consecutive_headings():
+    text = "## Section\n### Subsection\ntext\n"
+    expected = "## Section\n\n### Subsection\n\ntext\n"
+    assert fix_heading_spacing(text) == expected
+
+def test_heading_inside_fenced_block_unchanged():
+    text = "```\n# Not a heading\n```\n"
+    assert fix_heading_spacing(text) == text
+
+def test_hs_already_correct():
+    text = "text\n\n## Heading\n\nmore\n"
+    assert fix_heading_spacing(text) == text
 
 
 if __name__ == "__main__":
