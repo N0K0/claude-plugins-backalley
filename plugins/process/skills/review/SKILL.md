@@ -60,7 +60,7 @@ Do not proceed past the entry gate unless all six checks pass.
      - If multiple candidates are found, ask the user: "I found multiple issues referencing #N: #A, #B. Which is the umbrella issue, or none?"
      - If an umbrella issue is identified: call `issue_pull` for the umbrella, change `- [ ] #ISSUE_NUMBER` to `- [x] #ISSUE_NUMBER` in the umbrella's body, call `issue_push` for the umbrella. Tell the user: "Checked off #ISSUE_NUMBER in umbrella issue #N."
    - Clean up the worktree: `git worktree remove ../worktree-issue-{number}`
-   - Delete the local branch: `git branch -D issue-{number}`
+   - Delete the local branch from within the worktree or after removal — **never run `git checkout` in the main worktree** to do this. Use `git branch -D issue-{number}` from the main worktree (this deletes without switching branches) or from another worktree.
    - Confirm: "PR merged, issue #{N} closed, worktree cleaned up."
 
 6. **If user chooses keep open:**
@@ -102,12 +102,14 @@ When the user says "check for feedback", "there are review comments", or similar
 - Manually close the issue (let `Closes #N` handle it)
 - Skip the user's merge/keep-open choice
 - Clean up the worktree if the PR is kept open
+- Run `git checkout` or `git switch` in the main worktree (multiple sessions share it — switching branches breaks other running sessions)
 
 **Always:**
 - Run tests before creating the PR
 - Include `Closes #N` in the PR body
 - Let the user choose merge timing
 - Clean up worktree after merge
+- Perform all branch operations (merge, checkout, rebase) inside isolated worktrees, never in the main checkout
 
 ## Integration
 

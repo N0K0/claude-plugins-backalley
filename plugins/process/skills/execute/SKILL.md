@@ -62,6 +62,7 @@ Do not proceed past the entry gate unless all six checks pass.
 - **Directory:** `../worktree-issue-{number}` — a sibling to the main repo checkout
 - **Branch:** `issue-{number}`
 - Always work in the worktree directory, never on main/master
+- **Never run `git checkout` or `git switch` in the main worktree.** Multiple Claude Code sessions share the same checkout — switching branches in the main worktree will break every other running session. All branch operations (checkout, merge, rebase) must happen inside an isolated worktree.
 - The worktree is cleaned up by the review skill after merge
 
 The sibling layout keeps the worktree easy to find and avoids nested worktrees. Example: if the repo lives at `~/git/my-project`, the worktree is at `~/git/worktree-issue-42`.
@@ -111,6 +112,9 @@ This is the crash-recovery model: GitHub is the persistent state. What's checked
 **Problem:** Working on the main branch.
 **Fix:** Always use a worktree. The execute skill never works on main. If you find yourself in the main checkout, stop and set up the worktree before continuing.
 
+**Problem:** Switching branches in the main worktree.
+**Fix:** Never run `git checkout` or `git switch` in the main worktree. Multiple sessions share it — changing the branch breaks all other running sessions. Always operate inside a dedicated worktree.
+
 **Problem:** Not creating a worktree.
 **Fix:** Check `git worktree list` before starting implementation. If the worktree doesn't exist, create it. If it already exists from a prior session, reuse it.
 
@@ -124,6 +128,7 @@ This is the crash-recovery model: GitHub is the persistent state. What's checked
 
 **Never:**
 - Work on the main/master branch
+- Run `git checkout` or `git switch` in the main worktree (multiple sessions share it)
 - Batch sync checklist updates at the end of the session
 - Skip checklist items (even if they seem redundant or simple)
 - Reorder tasks without explicit user approval
