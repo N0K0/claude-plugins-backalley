@@ -1,0 +1,9 @@
+{
+  "name": "terminal-color-status",
+  "description": "Changes terminal background color to indicate when Claude Code is ready for input",
+  "author": {
+    "name": "nikolas"
+  },
+  "version": "0.1.0",
+  "keywords": ["terminal", "hooks", "status", "color", "osc"]
+}
