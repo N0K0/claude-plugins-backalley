@@ -14,6 +14,14 @@
       },
       "source": "./plugins/gh",
       "category": "development"
+    },
+    {
+      "name": "terminal-color-status",
+      "description": "Changes terminal background color to indicate when Claude Code is ready for input",
+      "author": {
+        "name": "nikolas"
+      },
+      "source": "./plugins/terminal-color-status"
     }
   ]
 }
