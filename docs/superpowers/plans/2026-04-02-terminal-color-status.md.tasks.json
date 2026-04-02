@@ -1,0 +1,14 @@
+{
+  "planPath": "docs/superpowers/plans/2026-04-02-terminal-color-status.md",
+  "tasks": [
+    {"id": 0, "subject": "Task 0: Create plugin scaffold", "status": "pending"},
+    {"id": 1, "subject": "Task 1: Create shared utilities (_common.sh)", "status": "pending", "blockedBy": [0]},
+    {"id": 2, "subject": "Task 2: Create detect-osc.sh (SessionStart)", "status": "pending", "blockedBy": [1]},
+    {"id": 3, "subject": "Task 3: Create set-ready.sh (Stop)", "status": "pending", "blockedBy": [1]},
+    {"id": 4, "subject": "Task 4: Create set-processing.sh (UserPromptSubmit)", "status": "pending", "blockedBy": [1]},
+    {"id": 5, "subject": "Task 5: Create cleanup.sh (SessionEnd)", "status": "pending", "blockedBy": [1]},
+    {"id": 6, "subject": "Task 6: Create README.md", "status": "pending", "blockedBy": [5]},
+    {"id": 7, "subject": "Task 7: Update marketplace.json and verify", "status": "pending", "blockedBy": [6]}
+  ],
+  "lastUpdated": "2026-04-02T08:45:00Z"
+}
