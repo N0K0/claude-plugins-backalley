@@ -5,7 +5,35 @@
 set -euo pipefail
 
 READY_COLOR="#001a0a"
+DEFAULT_BG="#232627"
 STATE_DIR="${XDG_RUNTIME_DIR:-/tmp}"
+
+# Normalize a color to 6-digit hex (#rrggbb) for comparison.
+# Handles: #RRGGBB, rgb:RRRR/GGGG/BBBB, rgb:RR/GG/BB
+normalize_color() {
+    local c="$1"
+    if [[ "$c" =~ ^#[0-9a-fA-F]{6}$ ]]; then
+        printf '%s' "$c" | tr '[:upper:]' '[:lower:]'
+    elif [[ "$c" =~ ^rgb: ]]; then
+        # Strip "rgb:" prefix, split on /
+        local raw="${c#rgb:}"
+        local r g b
+        IFS='/' read -r r g b <<< "$raw"
+        # Take first 2 hex digits of each component (handles both RR and RRRR)
+        printf '#%s%s%s' "${r:0:2}" "${g:0:2}" "${b:0:2}" | tr '[:upper:]' '[:lower:]'
+    else
+        printf '%s' "$c" | tr '[:upper:]' '[:lower:]'
+    fi
+}
+
+# Check if a detected color matches our ready tint (leftover from previous session).
+is_ready_color() {
+    local detected
+    detected=$(normalize_color "$1")
+    local ready
+    ready=$(normalize_color "$READY_COLOR")
+    [[ "$detected" == "$ready" ]]
+}
 
 # Parse session_id from hook input JSON on stdin.
 # Sets SESSION_ID and STATE_FILE globals.

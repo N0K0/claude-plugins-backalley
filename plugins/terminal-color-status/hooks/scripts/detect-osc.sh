@@ -37,7 +37,13 @@ detect_osc_support() {
     color=$(printf '%s' "$response" | sed 's/.*11;//' | tr -d '[:cntrl:]')
 
     if [[ -n "$color" ]]; then
-        write_state "true" "$color"
+        if is_ready_color "$color"; then
+            # Terminal still has tint from a previous session (ungraceful exit).
+            # Use default background instead.
+            write_state "true" "$DEFAULT_BG"
+        else
+            write_state "true" "$color"
+        fi
     else
         write_state "false" ""
     fi
