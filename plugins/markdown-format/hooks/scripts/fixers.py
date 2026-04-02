@@ -203,6 +203,118 @@ def fix_heading_spacing(content: str) -> str:
     return "\n".join(result)
 
 
+def _find_tables(lines, regions):
+    """Find (start, end) line ranges of markdown tables (exclusive end)."""
+    delim_pattern = re.compile(r"^\|?\s*:?-{1,}:?\s*(\|\s*:?-{1,}:?\s*)*\|?\s*$")
+    tables = []
+    i = 0
+    while i < len(lines) - 1:
+        if is_in_fenced_region(i, regions):
+            i += 1
+            continue
+        if "|" in lines[i] and delim_pattern.match(lines[i + 1].lstrip("> ")):
+            start = i
+            end = i + 2
+            while end < len(lines) and "|" in lines[end] and not is_in_fenced_region(end, regions):
+                end += 1
+            tables.append((start, end))
+            i = end
+        else:
+            i += 1
+    return tables
+
+
+def _format_table(lines):
+    """Format a list of table lines with aligned columns."""
+    prefix = ""
+    if lines[0].lstrip().startswith(">"):
+        m = re.match(r"^(>\s*)+", lines[0])
+        if m:
+            prefix = m.group(0)
+            lines = [line[len(prefix):] if line.startswith(prefix) else line for line in lines]
+
+    def parse_row(line):
+        line = line.strip()
+        if line.startswith("|"):
+            line = line[1:]
+        if line.endswith("|"):
+            line = line[:-1]
+        return [cell.strip() for cell in line.split("|")]
+
+    header_cells = parse_row(lines[0])
+    num_cols = len(header_cells)
+    delim_cells = parse_row(lines[1])
+
+    alignments = []
+    for i, cell in enumerate(delim_cells[:num_cols]):
+        cell = cell.strip()
+        if cell.startswith(":") and cell.endswith(":"):
+            alignments.append("center")
+        elif cell.endswith(":"):
+            alignments.append("right")
+        elif cell.startswith(":"):
+            alignments.append("left-explicit")
+        else:
+            alignments.append("left")
+    while len(alignments) < num_cols:
+        alignments.append("left")
+
+    all_rows = [header_cells]
+    for line in lines[2:]:
+        cells = parse_row(line)
+        cells = cells[:num_cols]
+        while len(cells) < num_cols:
+            cells.append("")
+        all_rows.append(cells)
+
+    col_widths = [3] * num_cols
+    for row in all_rows:
+        for j, cell in enumerate(row):
+            col_widths[j] = max(col_widths[j], len(cell))
+
+    def format_row(cells):
+        parts = []
+        for j, cell in enumerate(cells):
+            parts.append(f" {cell.ljust(col_widths[j])} ")
+        return "|" + "|".join(parts) + "|"
+
+    def format_delim():
+        parts = []
+        for j in range(num_cols):
+            width = col_widths[j]
+            if alignments[j] == "center":
+                parts.append(" :" + "-" * (width - 2) + ": ")
+            elif alignments[j] == "right":
+                parts.append(" " + "-" * (width - 1) + ": ")
+            elif alignments[j] == "left-explicit":
+                parts.append(" :" + "-" * (width - 1) + " ")
+            else:
+                parts.append(" " + "-" * width + " ")
+        return "|" + "|".join(parts) + "|"
+
+    result = [format_row(all_rows[0]), format_delim()]
+    for row in all_rows[1:]:
+        result.append(format_row(row))
+
+    if prefix:
+        result = [prefix + line for line in result]
+    return result
+
+
+def fix_tables(content: str) -> str:
+    """Align markdown table columns."""
+    lines = content.split("\n")
+    regions = find_fenced_regions(content)
+    tables = _find_tables(lines, regions)
+    if not tables:
+        return content
+    for start, end in reversed(tables):
+        table_lines = lines[start:end]
+        formatted = _format_table(table_lines)
+        lines[start:end] = formatted
+    return "\n".join(lines)
+
+
 def run_pipeline(content: str) -> tuple[str, list[str]]:
     """Run all fixers in order. Returns (fixed_content, list_of_fix_names)."""
     fixes = []
@@ -215,7 +327,7 @@ def run_pipeline(content: str) -> tuple[str, list[str]]:
 
 
 FIXERS: list[tuple[str, callable]] = [
-    # ("table alignment", fix_tables),
+    ("table alignment", fix_tables),
     ("trailing whitespace", fix_trailing_whitespace),
     ("code block spacing", fix_code_block_spacing),
     ("heading spacing", fix_heading_spacing),

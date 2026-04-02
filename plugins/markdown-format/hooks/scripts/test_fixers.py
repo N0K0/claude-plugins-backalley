@@ -5,7 +5,7 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(__file__))
 
-from fixers import find_fenced_regions, fix_trailing_whitespace, fix_list_markers, fix_code_block_spacing, fix_heading_spacing
+from fixers import find_fenced_regions, fix_trailing_whitespace, fix_list_markers, fix_code_block_spacing, fix_heading_spacing, fix_tables
 
 
 def test_no_fences():
@@ -156,6 +156,53 @@ def test_heading_inside_fenced_block_unchanged():
 def test_hs_already_correct():
     text = "text\n\n## Heading\n\nmore\n"
     assert fix_heading_spacing(text) == text
+
+
+def test_basic_table_alignment():
+    text = "| Name | Age |\n| --- | --- |\n| Alice | 30 |\n| Bob | 7 |\n"
+    expected = "| Name  | Age |\n| ----- | --- |\n| Alice | 30  |\n| Bob   | 7   |\n"
+    assert fix_tables(text) == expected
+
+def test_preserve_alignment_markers():
+    text = "| Left | Center | Right |\n| :--- | :---: | ---: |\n| a | b | c |\n"
+    result = fix_tables(text)
+    lines = result.strip().split("\n")
+    delim = lines[1]
+    cells = [c.strip() for c in delim.split("|")[1:-1]]
+    assert cells[0].startswith(":")  # left
+    assert cells[1].startswith(":") and cells[1].endswith(":")  # center
+    assert cells[2].endswith(":")  # right
+
+def test_malformed_row_fewer_columns():
+    text = "| A | B | C |\n| --- | --- | --- |\n| 1 | 2 |\n"
+    result = fix_tables(text)
+    lines = result.strip().split("\n")
+    assert lines[2].count("|") == 4  # 3 columns + outer pipes
+
+def test_malformed_row_more_columns():
+    text = "| A | B |\n| --- | --- |\n| 1 | 2 | 3 |\n"
+    result = fix_tables(text)
+    lines = result.strip().split("\n")
+    assert lines[2].count("|") == 3  # 2 columns + outer pipes
+
+def test_table_in_blockquote():
+    text = "> | A | B |\n> | --- | --- |\n> | 1 | 2 |\n"
+    result = fix_tables(text)
+    assert result.startswith("> |")
+
+def test_table_in_fenced_block_unchanged():
+    text = "```\n| A | B |\n| --- | --- |\n| 1 | 2 |\n```\n"
+    assert fix_tables(text) == text
+
+def test_no_table():
+    text = "Just some text\nMore text\n"
+    assert fix_tables(text) == text
+
+def test_table_with_surrounding_text():
+    text = "Before\n\n| A | B |\n| --- | --- |\n| 1 | 2 |\n\nAfter\n"
+    result = fix_tables(text)
+    assert result.startswith("Before")
+    assert result.endswith("After\n")
 
 
 if __name__ == "__main__":
