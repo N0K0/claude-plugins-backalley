@@ -1,7 +1,8 @@
 import { z } from 'zod';
 import { api } from '../gh.js';
 import { repoParams, paginationParams, slim, type ToolDef } from '../types.js';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, rename } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
 import { serializeIssue, parseIssueFile, issueFilePath, resolveIssuePaths, unifiedDiff } from './issue-files.js';
 
 const ISSUE_FIELDS = ['number', 'title', 'state', 'body', 'labels', 'milestone', 'assignees', 'html_url', 'created_at', 'updated_at', 'closed_at', 'user', 'node_id'];
@@ -222,32 +223,55 @@ export const tools: ToolDef[] = [
           const { frontmatter, body } = parseIssueFile(content);
 
           if (frontmatter.number === undefined) {
-            errors.push({
-              file: filePath.split('/').pop(),
-              error: 'Skipped: new-issue file (no number). Not yet pushed to GitHub.',
+            // Create new issue
+            const createBody: Record<string, unknown> = { title: frontmatter.title, body };
+            if (frontmatter.labels?.length) createBody.labels = frontmatter.labels;
+            if (frontmatter.milestone) createBody.milestone = frontmatter.milestone;
+            if (frontmatter.assignees?.length) createBody.assignees = frontmatter.assignees;
+
+            const created = await api(`/repos/${ctx.owner}/${ctx.repo}/issues`, {
+              method: 'POST',
+              body: createBody,
             });
-            continue;
+
+            // Write number to file first (crash safety)
+            const serialized = serializeIssue(created);
+            await Bun.write(filePath, serialized);
+
+            // Rename file
+            const newPath = join(dirname(filePath), `issue-${created.number}.md`);
+            await rename(filePath, newPath);
+
+            results.push({
+              action: 'created',
+              number: created.number,
+              title: created.title,
+              html_url: created.html_url,
+              file: newPath.split('/').pop(),
+            });
+          } else {
+            // Update existing issue
+            const patchBody: Record<string, unknown> = {
+              title: frontmatter.title,
+              state: frontmatter.state,
+              labels: frontmatter.labels,
+              milestone: frontmatter.milestone,
+              assignees: frontmatter.assignees,
+              body,
+            };
+
+            const result = await api(
+              `/repos/${ctx.owner}/${ctx.repo}/issues/${frontmatter.number}`,
+              { method: 'PATCH', body: patchBody },
+            );
+
+            results.push({
+              action: 'updated',
+              number: result.number,
+              title: result.title,
+              html_url: result.html_url,
+            });
           }
-
-          const patchBody: Record<string, unknown> = {
-            title: frontmatter.title,
-            state: frontmatter.state,
-            labels: frontmatter.labels,
-            milestone: frontmatter.milestone,
-            assignees: frontmatter.assignees,
-            body,
-          };
-
-          const result = await api(
-            `/repos/${ctx.owner}/${ctx.repo}/issues/${frontmatter.number}`,
-            { method: 'PATCH', body: patchBody },
-          );
-
-          results.push({
-            number: result.number,
-            title: result.title,
-            html_url: result.html_url,
-          });
         } catch (err: any) {
           errors.push({
             file: filePath.split('/').pop(),
