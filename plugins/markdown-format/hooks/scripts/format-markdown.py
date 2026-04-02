@@ -35,8 +35,12 @@ def main():
         print(json.dumps({}))
         sys.exit(0)
 
-    with open(file_path, "w", encoding="utf-8") as f:
-        f.write(result)
+    try:
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(result)
+    except (OSError, IOError):
+        print(json.dumps({}))
+        sys.exit(0)
 
     filename = os.path.basename(file_path)
     fix_list = ", ".join(fixes)

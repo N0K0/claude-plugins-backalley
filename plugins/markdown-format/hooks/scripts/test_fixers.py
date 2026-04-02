@@ -65,6 +65,9 @@ def test_ws_skip_fenced_code_blocks():
     expected = "hello\n```\ncode   \n```\nworld\n"
     assert fix_trailing_whitespace(text) == expected
 
+def test_whitespace_only_line_stripped():
+    assert fix_trailing_whitespace("hello\n   \nworld\n") == "hello\n\nworld\n"
+
 
 def test_asterisk_to_dash():
     assert fix_list_markers("* item\n") == "- item\n"

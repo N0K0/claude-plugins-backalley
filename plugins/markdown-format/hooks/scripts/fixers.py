@@ -53,9 +53,14 @@ def fix_trailing_whitespace(content: str) -> str:
             continue
         stripped = line.rstrip(" \t")
         trailing = line[len(stripped):]
-        if len(trailing) == 2 and trailing == "  ":
+        if not stripped:
+            # Whitespace-only line — strip completely
+            result.append("")
+        elif len(trailing) == 2 and trailing == "  ":
+            # Intentional line break — preserve
             result.append(line)
         elif len(trailing) >= 3 and all(c == " " for c in trailing):
+            # Reduce to intentional double-space
             result.append(stripped + "  ")
         else:
             result.append(stripped)
