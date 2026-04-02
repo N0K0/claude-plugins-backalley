@@ -5,7 +5,7 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(__file__))
 
-from fixers import find_fenced_regions, fix_trailing_whitespace, fix_list_markers
+from fixers import find_fenced_regions, fix_trailing_whitespace, fix_list_markers, fix_code_block_spacing
 
 
 def test_no_fences():
@@ -92,6 +92,35 @@ def test_lm_skip_fenced_code_blocks():
     text = "* item\n```\n* not a list\n```\n* item2\n"
     expected = "- item\n```\n* not a list\n```\n- item2\n"
     assert fix_list_markers(text) == expected
+
+
+def test_add_blank_before_fence():
+    text = "text\n```\ncode\n```\n"
+    expected = "text\n\n```\ncode\n```\n"
+    assert fix_code_block_spacing(text) == expected
+
+def test_add_blank_after_fence():
+    text = "```\ncode\n```\ntext\n"
+    expected = "```\ncode\n```\n\ntext\n"
+    assert fix_code_block_spacing(text) == expected
+
+def test_cbs_no_blank_at_file_start():
+    text = "```\ncode\n```\n"
+    assert fix_code_block_spacing(text) == text
+
+def test_collapse_multiple_blanks():
+    text = "text\n\n\n```\ncode\n```\n\n\ntext\n"
+    expected = "text\n\n```\ncode\n```\n\ntext\n"
+    assert fix_code_block_spacing(text) == expected
+
+def test_tilde_fences_spacing():
+    text = "text\n~~~\ncode\n~~~\ntext\n"
+    expected = "text\n\n~~~\ncode\n~~~\n\ntext\n"
+    assert fix_code_block_spacing(text) == expected
+
+def test_cbs_already_correct():
+    text = "text\n\n```\ncode\n```\n\ntext\n"
+    assert fix_code_block_spacing(text) == text
 
 
 if __name__ == "__main__":
