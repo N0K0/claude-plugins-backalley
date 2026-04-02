@@ -35,6 +35,9 @@ plugins/gh/
 │   └── scripts/
 │       ├── session-start-pull.sh
 │       └── stop-push.sh
+├── skills/
+│   └── create-issue/
+│       └── SKILL.md               # Teaches Claude the issue-new*.md convention
 ├── src/
 │   ├── hooks/
 │   │   ├── pull-existing.ts
@@ -146,6 +149,19 @@ On creation, the file gains `number`, `url`, `pulled_at` and is renamed to `issu
 ### Integration with issue_push MCP tool
 
 The existing `issue_push` tool also gains create-from-file logic. When it encounters `issue-new*.md` files in a directory push, it creates them the same way. This means both auto-sync and manual push handle new issues identically.
+
+### Skill: `create-issue`
+
+A lightweight skill at `plugins/gh/skills/create-issue/SKILL.md` teaches Claude the file-based issue creation workflow. Without this, Claude has no way to discover the `issue-new*.md` convention.
+
+The skill instructs Claude to:
+
+1. Write a file in `.issues/` matching `issue-new*.md` (e.g., `issue-new-auth-bug.md`)
+2. Use the frontmatter format: `title` (required), `labels`, `milestone`, `assignees` (optional)
+3. Write the issue body as markdown after the frontmatter
+4. The file is auto-pushed on the next Stop hook, or can be pushed manually with `issue_push`
+
+The skill is ~20 lines — just the convention and format, no complex logic. It triggers when the user asks to create a GitHub issue or track something as an issue.
 
 ## Required changes to existing code
 
