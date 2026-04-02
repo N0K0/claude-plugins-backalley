@@ -39,11 +39,17 @@ Do not proceed past the entry gate unless all five checks pass.
 
 6. Once approved, append the checklist to the issue body below the spec. Write it back via `issue_push`.
 
-7. Create native Claude Code tasks via `TaskCreate` for session tracking — one task per checklist item.
+7. **Link to umbrella issue (if applicable):**
+   - Check the issue body for a `Parent: #N` line. If found, N is the umbrella issue number.
+   - If no `Parent:` line exists, call `issue_search` with query `"#ISSUE_NUMBER" in:body is:open` to find issues whose body references this issue. Filter results to those containing a GitHub tasklist (`- [ ]` or `- [x]` items) that includes this issue number. If exactly one match is found, that is the umbrella.
+   - If multiple candidates are found, ask the user: "I found multiple issues referencing #N: #A, #B. Which is the umbrella issue, or none?"
+   - If an umbrella issue is identified: call `issue_pull` for the umbrella issue, check if `#ISSUE_NUMBER` already appears in the umbrella's tasklist, and if not, append `- [ ] #ISSUE_NUMBER` to the umbrella's tasklist and call `issue_push` for the umbrella.
 
-8. Call `issue_update` to remove the `backlog` and `has-spec` labels and add `in-progress`.
+8. Create native Claude Code tasks via `TaskCreate` for session tracking — one task per checklist item.
 
-9. Tell the user: "Checklist added to issue #N. Run `execute` to start implementation."
+9. Call `issue_update` to remove the `backlog` and `has-spec` labels and add `in-progress`.
+
+10. Tell the user: "Checklist added to issue #N. Run `execute` to start implementation."
 
 ## Checklist Format
 
@@ -85,11 +91,12 @@ Tasks should be concrete and file-level — "Create X in Y" or "Modify Z to add 
 - Name specific files in each task
 - Get user approval on the checklist before pushing
 - Create native tasks for session tracking
+- Link to umbrella issue if one exists
 - Transition labels after pushing (`backlog` + `has-spec` → `in-progress`)
 
 ## Integration
 
-**Requires:** gh plugin (`detect_repo`, `issue_pull`, `issue_push`, `issue_update`)
+**Requires:** gh plugin (`detect_repo`, `issue_pull`, `issue_push`, `issue_update`, `issue_search`)
 
 **Previous skill:** `brainstorm` (wrote the spec into the issue body)
 

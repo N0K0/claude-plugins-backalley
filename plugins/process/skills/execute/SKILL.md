@@ -43,7 +43,19 @@ Do not proceed past the entry gate unless all six checks pass.
    - In the local issue file, change `- [ ]` to `- [x]` for this item.
    - Call `issue_push` to sync the updated checklist to GitHub.
 
-5. When all items are checked, tell the user: "All tasks complete for issue #N. Run `review` to create a PR."
+5. **Final quality review** — after all checklist items are checked but before telling the user to run review:
+
+   a. Run the project's full test suite. Look for test scripts in `package.json` (`scripts.test`), a `Makefile` (`make test`), or other common test runners. If tests fail, fix them and commit the fixes.
+
+   b. Run the project's linter if one exists (check `package.json` for a `lint` script, `Makefile` for a `lint` target, or common config files like `.eslintrc`, `ruff.toml`, `biome.json`). Fix any issues and commit.
+
+   c. Dispatch a code-review subagent with these instructions: "Review the diff between the `issue-{number}` branch and `main`. Check for: code reuse opportunities (duplicated logic that could be extracted), style and practices issues (naming, error handling, logging), missing or inadequate tests, potential performance issues. Return a list of specific findings with file paths and line numbers, or 'PASS' if the code is clean."
+
+   d. If the subagent returns findings: fix each issue, commit the fixes, and re-run the subagent (max 3 iterations).
+
+   e. After the review passes (or after 3 iterations), sync the final checklist state via `issue_push`.
+
+6. When all items are checked and the quality review passes, tell the user: "All tasks complete for issue #N. Run `review` to create a PR."
 
 ## Worktree Conventions
 
@@ -53,6 +65,32 @@ Do not proceed past the entry gate unless all six checks pass.
 - The worktree is cleaned up by the review skill after merge
 
 The sibling layout keeps the worktree easy to find and avoids nested worktrees. Example: if the repo lives at `~/git/my-project`, the worktree is at `~/git/worktree-issue-42`.
+
+## Multi-Worktree (Optional Optimization)
+
+For checklists with independent tasks that touch non-overlapping files, you can offer parallel execution using multiple worktrees. This is an optimization — default to single-worktree sequential execution unless the user opts in.
+
+**When to offer:** After parsing the checklist in step 1, analyze the tasks for file-path independence. Two tasks are independent if they modify entirely different sets of files (no shared file paths). If 2 or more consecutive tasks are independent, offer multi-worktree to the user: "Tasks N and M appear independent (no overlapping files). I can work them in parallel using separate worktrees. Want to try that?"
+
+**How it works:**
+1. For each independent task, create a temporary worktree:
+   - Branch: `issue-{number}-task-{N}` (temporary)
+   - Directory: `../worktree-issue-{number}-task-{N}`
+   - Base: branch off `issue-{number}` (the main feature branch)
+2. Complete the task in its temporary worktree. Commit changes.
+3. When the task is done, merge the temporary branch back into `issue-{number}`:
+   - `cd ../worktree-issue-{number}` (main worktree)
+   - `git merge issue-{number}-task-{N}`
+   - `git worktree remove ../worktree-issue-{number}-task-{N}`
+   - `git branch -d issue-{number}-task-{N}`
+4. Tick the checkbox and sync via `issue_push` as normal.
+
+**Conflict handling:** If merge conflicts occur, resolve them in the main worktree, commit, and continue. If conflicts are complex, fall back to sequential execution for remaining tasks.
+
+**Do not use multi-worktree when:**
+- Tasks have implicit ordering dependencies (later tasks use types/functions created by earlier tasks)
+- The user hasn't opted in
+- There are fewer than 2 independent tasks
 
 ## Resuming Interrupted Work
 
@@ -79,6 +117,9 @@ This is the crash-recovery model: GitHub is the persistent state. What's checked
 **Problem:** Ticking items out of order.
 **Fix:** Work through the checklist sequentially from top to bottom. Tasks may have implicit dependencies — later tasks often assume earlier ones are complete. Reordering without user approval risks building on a broken foundation.
 
+**Problem:** Telling the user to run review without running a quality check.
+**Fix:** Always run tests, lint, and subagent code review after completing all checklist items. Catching issues here is cheaper than catching them in PR review.
+
 ## Red Flags
 
 **Never:**
@@ -92,6 +133,7 @@ This is the crash-recovery model: GitHub is the persistent state. What's checked
 - Sync to GitHub via `issue_push` after every completed item
 - Work through the checklist sequentially
 - Commit changes after each item before syncing
+- Run final quality review (tests, lint, subagent code review) before handing off to review
 - Resume from the first unchecked item when continuing interrupted work
 
 ## Integration
