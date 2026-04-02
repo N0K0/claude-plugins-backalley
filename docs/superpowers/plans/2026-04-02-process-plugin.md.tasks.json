@@ -1,0 +1,12 @@
+{
+  "planPath": "docs/superpowers/plans/2026-04-02-process-plugin.md",
+  "tasks": [
+    {"id": 0, "subject": "Task 0: Plugin scaffold", "status": "pending"},
+    {"id": 1, "subject": "Task 1: Brainstorm skill", "status": "pending", "blockedBy": [0]},
+    {"id": 2, "subject": "Task 2: Plan skill", "status": "pending", "blockedBy": [0]},
+    {"id": 3, "subject": "Task 3: Execute skill", "status": "pending", "blockedBy": [0]},
+    {"id": 4, "subject": "Task 4: Review skill", "status": "pending", "blockedBy": [0]},
+    {"id": 5, "subject": "Task 5: Marketplace + README + final verification", "status": "pending", "blockedBy": [0, 1, 2, 3, 4]}
+  ],
+  "lastUpdated": "2026-04-02T00:00:00.000Z"
+}

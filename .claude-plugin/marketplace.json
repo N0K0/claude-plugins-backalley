@@ -16,6 +16,15 @@
       "category": "development"
     },
     {
+      "name": "process",
+      "description": "GitHub Issues-driven development workflow — brainstorm, plan, execute, review",
+      "author": {
+        "name": "nikolas"
+      },
+      "source": "./plugins/process",
+      "category": "development"
+    },
+    {
       "name": "terminal-color-status",
       "description": "Changes terminal background color to indicate when Claude Code is ready for input",
       "author": {
