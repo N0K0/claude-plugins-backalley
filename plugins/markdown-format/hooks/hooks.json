@@ -1,0 +1,27 @@
+{
+  "description": "Auto-fix common markdown formatting issues in .md files",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/format-markdown.py",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/format-markdown.py",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

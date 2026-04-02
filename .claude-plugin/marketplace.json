@@ -16,6 +16,14 @@
       "category": "development"
     },
     {
+      "name": "markdown-format",
+      "description": "Auto-fix common markdown formatting issues in .md files",
+      "author": {
+        "name": "nikolas"
+      },
+      "source": "./plugins/markdown-format"
+    },
+    {
       "name": "process",
       "description": "GitHub Issues-driven development workflow — brainstorm, plan, execute, review",
       "author": {
