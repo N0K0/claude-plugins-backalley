@@ -205,6 +205,30 @@ def test_table_with_surrounding_text():
     assert result.endswith("After\n")
 
 
+from fixers import run_pipeline
+
+def test_pipeline_multiple_fixes():
+    text = "# Title\ntext\n* item\n| A|B |\n| ---|--- |\n| 1|2 |\nmore   \n"
+    result, fixes = run_pipeline(text)
+    assert "table alignment" in fixes
+    assert "trailing whitespace" in fixes
+    assert "heading spacing" in fixes
+    assert "list markers" in fixes
+    assert "* " not in result
+    assert "more   " not in result
+
+def test_pipeline_no_fixes_needed():
+    text = "# Title\n\nSome text.\n"
+    result, fixes = run_pipeline(text)
+    assert fixes == []
+    assert result == text
+
+def test_pipeline_fenced_blocks_protected():
+    text = "```\n* item\n| bad|table |\ntrailing   \n```\n"
+    result, fixes = run_pipeline(text)
+    assert result == text
+
+
 if __name__ == "__main__":
     for name, func in list(globals().items()):
         if name.startswith("test_"):
