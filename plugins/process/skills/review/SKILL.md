@@ -53,6 +53,12 @@ Do not proceed past the entry gate unless all six checks pass.
 
 5. **If user chooses merge:**
    - Call `pr_merge` with squash strategy.
+   - **Check off in umbrella issue:**
+     - Check the issue body for a `Parent: #N` line. If found, N is the umbrella issue number.
+     - If no `Parent:` line, call `issue_search` with query `"#ISSUE_NUMBER" in:body is:open` to find issues whose body references this issue and contains a GitHub tasklist (`- [ ]` or `- [x]` items).
+     - If no match is found, skip this step.
+     - If multiple candidates are found, ask the user: "I found multiple issues referencing #N: #A, #B. Which is the umbrella issue, or none?"
+     - If an umbrella issue is identified: call `issue_pull` for the umbrella, change `- [ ] #ISSUE_NUMBER` to `- [x] #ISSUE_NUMBER` in the umbrella's body, call `issue_push` for the umbrella. Tell the user: "Checked off #ISSUE_NUMBER in umbrella issue #N."
    - Clean up the worktree: `git worktree remove ../worktree-issue-{number}`
    - Delete the local branch: `git branch -D issue-{number}`
    - Confirm: "PR merged, issue #{N} closed, worktree cleaned up."
@@ -61,6 +67,22 @@ Do not proceed past the entry gate unless all six checks pass.
    - Tell the user the PR URL.
    - Do not clean up the worktree — the user may still need it.
    - Confirm: "PR is open at {url}. Merge manually when ready. The worktree at `../worktree-issue-{number}` is still available."
+
+## Handling GitHub Feedback
+
+When the user says "check for feedback", "there are review comments", or similar:
+
+1. Get the timestamp of the last commit on the current branch: `git log -1 --format=%cI` in the worktree directory. (Use last commit, not `pulled_at`, because the feedback is on the code diff, not the issue body.)
+2. Call `issue_comments_list` with `issue_number` and `since` set to that timestamp.
+3. If no new comments are returned, tell the user: "No new comments on issue #N since the last commit."
+4. If new comments are found, for each comment:
+   - Summarize what the reviewer is asking for.
+   - Make the requested code changes in the worktree.
+   - Commit each logical change with a descriptive message referencing the feedback.
+5. Re-run the project's test suite to verify nothing is broken.
+6. If tests fail, fix the failures before proceeding.
+7. Push the branch: `git push` from the worktree.
+8. Present a summary of changes made to the user.
 
 ## Common Mistakes
 
@@ -89,7 +111,7 @@ Do not proceed past the entry gate unless all six checks pass.
 
 ## Integration
 
-**Requires:** gh plugin (`detect_repo`, `issue_pull`, `pr_create`, `pr_merge`), git worktrees
+**Requires:** gh plugin (`detect_repo`, `issue_pull`, `issue_push`, `issue_search`, `issue_comments_list`, `pr_create`, `pr_merge`), git worktrees
 
 **Previous skill:** `execute` (completed all checklist items)
 
