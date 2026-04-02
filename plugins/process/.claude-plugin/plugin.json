@@ -1,0 +1,9 @@
+{
+  "name": "process",
+  "description": "GitHub Issues-driven development workflow — brainstorm, plan, execute, review",
+  "author": {
+    "name": "nikolas"
+  },
+  "version": "0.1.0",
+  "keywords": ["workflow", "process", "github", "issues", "development"]
+}

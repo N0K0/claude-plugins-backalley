@@ -14,6 +14,15 @@
       },
       "source": "./plugins/gh",
       "category": "development"
+    },
+    {
+      "name": "process",
+      "description": "GitHub Issues-driven development workflow — brainstorm, plan, execute, review",
+      "author": {
+        "name": "nikolas"
+      },
+      "source": "./plugins/process",
+      "category": "development"
     }
   ]
 }
