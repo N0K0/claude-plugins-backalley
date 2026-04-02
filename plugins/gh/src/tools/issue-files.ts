@@ -210,14 +210,17 @@ export async function resolveIssuePaths(path: string): Promise<string[]> {
   if (s.isFile()) return [path];
   if (s.isDirectory()) {
     const entries = await readdir(path);
-    return entries
+    const numbered = entries
       .filter(e => /^issue-\d+\.md$/.test(e))
       .sort((a, b) => {
         const numA = parseInt(a.match(/issue-(\d+)/)?.[1] ?? '0');
         const numB = parseInt(b.match(/issue-(\d+)/)?.[1] ?? '0');
         return numA - numB;
-      })
-      .map(e => join(path, e));
+      });
+    const newIssues = entries
+      .filter(e => /^issue-new.*\.md$/.test(e))
+      .sort();
+    return [...numbered, ...newIssues].map(e => join(path, e));
   }
   throw new Error(`Path is neither a file nor directory: ${path}`);
 }

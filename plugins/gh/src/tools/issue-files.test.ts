@@ -61,3 +61,38 @@ Body`;
     expect(() => parseIssueFile(content)).toThrow('missing "title"');
   });
 });
+
+describe('resolveIssuePaths', () => {
+  const tmpDir = join(import.meta.dir, '__test_tmp_resolve');
+
+  test('includes both numbered and new-issue files from directory', async () => {
+    await mkdir(tmpDir, { recursive: true });
+    await writeFile(join(tmpDir, 'issue-1.md'), '---\ntitle: "One"\n---\n\n');
+    await writeFile(join(tmpDir, 'issue-10.md'), '---\ntitle: "Ten"\n---\n\n');
+    await writeFile(join(tmpDir, 'issue-new.md'), '---\ntitle: "New"\n---\n\n');
+    await writeFile(join(tmpDir, 'issue-new-auth.md'), '---\ntitle: "Auth"\n---\n\n');
+    await writeFile(join(tmpDir, 'README.md'), 'ignore me');
+
+    const paths = await resolveIssuePaths(tmpDir);
+    const names = paths.map(p => p.split('/').pop());
+
+    // Numbered files sorted by number, then new-issue files sorted alphabetically
+    expect(names).toEqual([
+      'issue-1.md',
+      'issue-10.md',
+      'issue-new-auth.md',
+      'issue-new.md',
+    ]);
+
+    await rm(tmpDir, { recursive: true });
+  });
+
+  test('returns single file path when given a file', async () => {
+    await mkdir(tmpDir, { recursive: true });
+    const f = join(tmpDir, 'issue-5.md');
+    await writeFile(f, '---\ntitle: "Five"\n---\n\n');
+    const paths = await resolveIssuePaths(f);
+    expect(paths).toEqual([f]);
+    await rm(tmpDir, { recursive: true });
+  });
+});
