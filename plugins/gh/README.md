@@ -72,11 +72,11 @@ When you pull issues (`issue_pull`), they are written to `.issues/` in the curre
 
 ```
 .issues/
-  42.md          # existing issue — edit body/frontmatter, then push
-  issue-new.md   # new issue to create — picked up on next push/Stop hook
+  issue-42.md       # existing issue — edit body/frontmatter, then push
+  issue-new.md      # new issue to create — picked up on next push/Stop hook
 ```
 
-Files are named `<number>.md` for existing issues. New issues use any filename matching `issue-new*.md` (e.g., `issue-new-auth-bug.md`, `issue-new2.md`).
+Files are named `issue-{number}.md` for existing issues. New issues use any filename matching `issue-new*.md` (e.g., `issue-new-auth-bug.md`).
 
 Frontmatter fields: `title`, `number`, `state`, `labels`, `assignees`, `milestone`, `updated_at`.
 
@@ -93,7 +93,7 @@ labels: ["bug"]
 Body text here.
 ```
 
-On the next `issue_push` call (or when the session ends via the Stop hook), the file is created as a GitHub issue and renamed to `<number>.md`.
+On the next `issue_push` call (or when the session ends via the Stop hook), the file is created as a GitHub issue and renamed to `issue-{number}.md`.
 
 ### Auto-Sync Hooks
 

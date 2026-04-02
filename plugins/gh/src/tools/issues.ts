@@ -265,6 +265,9 @@ export const tools: ToolDef[] = [
               { method: 'PATCH', body: patchBody },
             );
 
+            // Rewrite file with updated pulled_at (keeps local in sync)
+            await Bun.write(filePath, serializeIssue(result));
+
             results.push({
               action: 'updated',
               number: result.number,
