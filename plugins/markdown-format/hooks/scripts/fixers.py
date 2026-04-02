@@ -42,6 +42,26 @@ def is_in_fenced_region(line_idx: int, regions: list[tuple[int, int]]) -> bool:
     return any(start <= line_idx <= end for start, end in regions)
 
 
+def fix_trailing_whitespace(content: str) -> str:
+    """Remove trailing whitespace, preserving intentional double-space line breaks."""
+    lines = content.split("\n")
+    regions = find_fenced_regions(content)
+    result = []
+    for i, line in enumerate(lines):
+        if is_in_fenced_region(i, regions):
+            result.append(line)
+            continue
+        stripped = line.rstrip(" \t")
+        trailing = line[len(stripped):]
+        if len(trailing) == 2 and trailing == "  ":
+            result.append(line)
+        elif len(trailing) >= 3 and all(c == " " for c in trailing):
+            result.append(stripped + "  ")
+        else:
+            result.append(stripped)
+    return "\n".join(result)
+
+
 def run_pipeline(content: str) -> tuple[str, list[str]]:
     """Run all fixers in order. Returns (fixed_content, list_of_fix_names)."""
     fixes = []
@@ -55,7 +75,7 @@ def run_pipeline(content: str) -> tuple[str, list[str]]:
 
 FIXERS: list[tuple[str, callable]] = [
     # ("table alignment", fix_tables),
-    # ("trailing whitespace", fix_trailing_whitespace),
+    ("trailing whitespace", fix_trailing_whitespace),
     # ("code block spacing", fix_code_block_spacing),
     # ("heading spacing", fix_heading_spacing),
     # ("list markers", fix_list_markers),
