@@ -43,6 +43,7 @@ plugins/terminal-color-status/
   "hooks": {
     "SessionStart": [
       {
+        "matcher": "*",
         "hooks": [
           {
             "type": "command",
@@ -54,6 +55,7 @@ plugins/terminal-color-status/
     ],
     "UserPromptSubmit": [
       {
+        "matcher": "*",
         "hooks": [
           {
             "type": "command",
@@ -65,6 +67,7 @@ plugins/terminal-color-status/
     ],
     "Stop": [
       {
+        "matcher": "*",
         "hooks": [
           {
             "type": "command",
@@ -76,6 +79,7 @@ plugins/terminal-color-status/
     ],
     "SessionEnd": [
       {
+        "matcher": "*",
         "hooks": [
           {
             "type": "command",
