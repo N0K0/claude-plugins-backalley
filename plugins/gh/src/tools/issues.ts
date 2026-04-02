@@ -148,6 +148,32 @@ export const tools: ToolDef[] = [
     },
   },
   {
+    name: 'issue_comments_list',
+    description: 'List comments on a GitHub issue, optionally filtered by timestamp',
+    inputSchema: z.object({
+      ...repoParams,
+      issue_number: z.number().describe('Issue number'),
+      since: z.string().optional().describe('ISO 8601 timestamp — only comments updated at or after this time are returned'),
+      ...paginationParams,
+    }),
+    handler: async (args, ctx) => {
+      const fields: Record<string, string> = {
+        per_page: String(args.per_page ?? 30),
+      };
+      if (args.since) fields.since = args.since;
+      const result = await api(
+        `/repos/${ctx.owner}/${ctx.repo}/issues/${args.issue_number}/comments`,
+        { fields },
+      );
+      if (!Array.isArray(result)) return result;
+      return result.map((c: any) => {
+        const slimmed = slim(c, COMMENT_FIELDS);
+        if (slimmed.user) slimmed.user = slimmed.user.login ?? slimmed.user;
+        return slimmed;
+      });
+    },
+  },
+  {
     name: 'issue_pull',
     description: 'Pull GitHub issues to local markdown files with YAML frontmatter for token-efficient editing',
     inputSchema: z.object({

@@ -36,11 +36,47 @@ Do not proceed past the entry gate unless all four checks pass.
 
 5. After the user picks an approach, break the design into sections. Present one section at a time, get explicit approval before moving to the next. Scale each section to its complexity — a few sentences if simple, more detail if the design is nuanced or has non-obvious consequences.
 
-6. Once all sections are approved, assemble the full spec and write it into the issue body via `issue_push`.
+6. If the user mentions this issue is part of a larger initiative or umbrella issue, include a `Parent: #N` line at the top of the spec body when writing it.
 
-7. Call `issue_update` to remove the `needs-spec` label and add `has-spec`.
+7. Once all sections are approved, assemble the full spec and write it into the issue body via `issue_push`.
 
-8. Tell the user: "Spec written to issue #N. Run `plan` to create the implementation checklist."
+8. Run the internal review loop before presenting the spec to the user (see below).
+
+9. Call `issue_update` to remove the `needs-spec` label and add `has-spec`.
+
+10. Tell the user: "Spec written to issue #N. Run `plan` to create the implementation checklist."
+
+## Internal Review Loop
+
+After writing the spec to the issue body (step 7) but before transitioning labels (step 9), run this loop (max 5 iterations):
+
+**a. Checklist gate (fast):** Verify the spec contains all 5 required sections. If any is missing or empty, add it and re-push via `issue_push`.
+
+1. **Problem statement** — what problem are we solving and for whom?
+2. **Acceptance criteria** — concrete, testable conditions for "done"
+3. **Edge cases** — what could go wrong, what are the boundary conditions?
+4. **Scope boundaries** — what is explicitly out of scope?
+5. **Dependencies** — what does this depend on, what depends on this?
+
+**b. Subagent review (deep):** Dispatch a review subagent with these instructions: "Review the following spec for completeness, internal consistency, and clarity. Flag: vague acceptance criteria, contradictions between sections, unstated assumptions, missing error handling, scope creep beyond the stated problem. Return a list of specific issues found, or 'PASS' if the spec is ready." Pass the full spec text to the subagent.
+
+**c. If the subagent returns issues:** Fix each issue in the spec, re-push via `issue_push`, increment the iteration counter, and go back to step (a).
+
+**d. If the subagent returns PASS or iteration count reaches 5:** Proceed to step 9. If stopped at 5 iterations, tell the user: "Internal review found issues I couldn't fully resolve after 5 attempts. Presenting the spec as-is — please pay extra attention to the flagged areas."
+
+## Handling GitHub Feedback
+
+When the user says "check for feedback", "there's feedback on GitHub", or similar:
+
+1. Get the timestamp from the local issue file's `pulled_at` frontmatter field — this is the cutoff. (Use `pulled_at` because the work product is the issue body itself, so the last sync time is the right boundary.)
+2. Call `issue_comments_list` with `issue_number` and `since` set to that timestamp.
+3. If no new comments are returned, tell the user: "No new comments on issue #N since the last update."
+4. If new comments are found, for each comment:
+   - Summarize what the commenter is asking for.
+   - Apply the feedback to the spec in the local issue file.
+5. Call `issue_push` to sync the updated spec to GitHub.
+6. Re-run the internal review loop on the updated spec.
+7. Present a summary of changes made to the user.
 
 ## Key Principles
 
@@ -65,6 +101,9 @@ Do not proceed past the entry gate unless all four checks pass.
 **Problem:** Forgetting the label transition.
 **Fix:** Always call `issue_update` to swap `needs-spec` → `has-spec` after writing the spec.
 
+**Problem:** Presenting the spec to the user without running internal review.
+**Fix:** Always run the checklist gate + subagent review before transitioning labels. This catches obvious gaps before the user has to.
+
 ## Red Flags
 
 **Never:**
@@ -77,12 +116,13 @@ Do not proceed past the entry gate unless all four checks pass.
 **Always:**
 - Ask one question at a time
 - Write the spec to the issue body via `issue_push`
+- Run internal review (checklist gate + subagent) before presenting the spec
 - Transition labels after the spec is written (`needs-spec` → `has-spec`)
 - Tell the user what to run next (`plan`)
 
 ## Integration
 
-**Requires:** gh plugin (`detect_repo`, `issue_pull`, `issue_push`, `issue_update`)
+**Requires:** gh plugin (`detect_repo`, `issue_pull`, `issue_push`, `issue_update`, `issue_comments_list`)
 
 **Next skill:** `plan` (creates implementation checklist from the spec)
 
