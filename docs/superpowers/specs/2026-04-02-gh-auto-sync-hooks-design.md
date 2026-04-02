@@ -46,16 +46,47 @@ plugins/gh/
 
 ### hooks.json
 
-Registers two Claude Code hook events:
-
-- `SessionStart` → `session-start-pull.sh` (timeout: 30s)
-- `Stop` → `stop-push.sh` (timeout: 30s)
+```json
+{
+  "description": "Auto-sync GitHub issue files in .issues/",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/session-start-pull.sh",
+            "timeout": 30
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/hooks/scripts/stop-push.sh",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}
+```
 
 No pre-commit hook — Claude Code doesn't have a PreCommit event. Users can wire the Bun scripts into a git pre-commit hook manually if desired.
 
 ### Bash wrappers
 
 Each is ~5 lines: read JSON from stdin, invoke `bun run ${CLAUDE_PLUGIN_ROOT}/src/hooks/<script>.ts`, forward stdout. Follows the terminal-color-status pattern.
+
+### Working directory
+
+Claude Code runs hook scripts with the user's project directory as the working directory. The Bun scripts use `process.cwd()` as the starting point for `findProjectRoot()`. If the cwd is not inside a git repo with a GitHub remote, the hook exits silently.
 
 ## Component designs
 
@@ -84,7 +115,7 @@ Edge cases:
    - Compare file mtime against `pulled_at` — skip unmodified files
    - Fetch remote state via `gh api`
    - **Conflict check**: if remote `updated_at` > local `pulled_at`, skip and warn
-   - **No conflict**: PATCH the issue, update `pulled_at` to now
+   - **No conflict**: PATCH the issue, rewrite the file with updated `pulled_at` (this resets mtime, so subsequent Stop hooks won't re-push since mtime == `pulled_at`)
 4. For new issues (files matching `issue-new*.md`):
    - Validate `title` exists — skip with error if missing
    - POST to create issue
@@ -116,13 +147,31 @@ On creation, the file gains `number`, `url`, `pulled_at` and is renamed to `issu
 
 The existing `issue_push` tool also gains create-from-file logic. When it encounters `issue-new*.md` files in a directory push, it creates them the same way. This means both auto-sync and manual push handle new issues identically.
 
+## Required changes to existing code
+
+### `parseIssueFile()` — make `number` optional
+
+Currently throws if `number` is missing from frontmatter. Must be relaxed to return `number: number | undefined` so that `issue-new*.md` files can be parsed. Callers that require a number (e.g., existing `issue_push` for updates) validate after parsing.
+
+### `IssueFrontmatter` type — optional fields for new issues
+
+`number`, `url`, and `pulled_at` become optional in the type definition. A new-issue file won't have these fields until after creation.
+
+### `resolveIssuePaths()` — include new-issue files
+
+Currently uses regex `/^issue-\d+\.md$/` which excludes `issue-new*.md`. Must be updated to also match `issue-new*.md` patterns when scanning a directory.
+
+### New issue creation — write `number` before rename
+
+After POSTing a new issue, write `number` and `url` to the file's frontmatter first, then rename. If the process is killed between write and rename, the file has a `number` and won't be re-created on the next run.
+
 ## Code reuse
 
 The Bun hook scripts import directly from existing modules:
 
 | Module | Reused exports |
 |---|---|
-| `src/tools/issue-files.ts` | `serializeIssue()`, `parseIssueFile()` |
+| `src/tools/issue-files.ts` | `serializeIssue()`, `parseIssueFile()` (modified) |
 | `src/gh.ts` | `api()`, `detectRepo()` |
 | `src/types.ts` | `slim()` |
 
@@ -148,6 +197,8 @@ No new dependencies.
 | Hook timeout (30s) | Harness kills process — partial work is fine |
 
 **Principle:** Auto-sync never blocks the session or fails loudly. All errors become warnings. Manual MCP tools are always available as fallback.
+
+**Known limitation:** Each issue requires a separate `gh api` call. With the 30-second timeout, practical limit is ~50 cached issues before the hook risks being killed. Partial work is acceptable — some files get updated, others remain stale until next session. GraphQL batching could be added later if this becomes a problem.
 
 ## Hook output contract
 
