@@ -62,6 +62,24 @@ def fix_trailing_whitespace(content: str) -> str:
     return "\n".join(result)
 
 
+def fix_list_markers(content: str) -> str:
+    """Normalize unordered list markers (* and +) to -."""
+    lines = content.split("\n")
+    regions = find_fenced_regions(content)
+    result = []
+    marker_pattern = re.compile(r"^(\s*)([*+])(\s+)")
+    for i, line in enumerate(lines):
+        if is_in_fenced_region(i, regions):
+            result.append(line)
+            continue
+        m = marker_pattern.match(line)
+        if m:
+            result.append(m.group(1) + "-" + m.group(3) + line[m.end():])
+        else:
+            result.append(line)
+    return "\n".join(result)
+
+
 def run_pipeline(content: str) -> tuple[str, list[str]]:
     """Run all fixers in order. Returns (fixed_content, list_of_fix_names)."""
     fixes = []
@@ -78,5 +96,5 @@ FIXERS: list[tuple[str, callable]] = [
     ("trailing whitespace", fix_trailing_whitespace),
     # ("code block spacing", fix_code_block_spacing),
     # ("heading spacing", fix_heading_spacing),
-    # ("list markers", fix_list_markers),
+    ("list markers", fix_list_markers),
 ]

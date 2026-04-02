@@ -5,7 +5,7 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(__file__))
 
-from fixers import find_fenced_regions, fix_trailing_whitespace
+from fixers import find_fenced_regions, fix_trailing_whitespace, fix_list_markers
 
 
 def test_no_fences():
@@ -64,6 +64,34 @@ def test_ws_skip_fenced_code_blocks():
     text = "hello \n```\ncode   \n```\nworld \n"
     expected = "hello\n```\ncode   \n```\nworld\n"
     assert fix_trailing_whitespace(text) == expected
+
+
+def test_asterisk_to_dash():
+    assert fix_list_markers("* item\n") == "- item\n"
+
+def test_plus_to_dash():
+    assert fix_list_markers("+ item\n") == "- item\n"
+
+def test_dash_unchanged():
+    assert fix_list_markers("- item\n") == "- item\n"
+
+def test_nested_list_preserves_indent():
+    text = "* outer\n  * inner\n    * deep\n"
+    expected = "- outer\n  - inner\n    - deep\n"
+    assert fix_list_markers(text) == expected
+
+def test_ordered_list_unchanged():
+    text = "1. first\n2. second\n"
+    assert fix_list_markers(text) == text
+
+def test_asterisk_in_text_unchanged():
+    text = "This is **bold** text\n"
+    assert fix_list_markers(text) == text
+
+def test_lm_skip_fenced_code_blocks():
+    text = "* item\n```\n* not a list\n```\n* item2\n"
+    expected = "- item\n```\n* not a list\n```\n- item2\n"
+    assert fix_list_markers(text) == expected
 
 
 if __name__ == "__main__":
