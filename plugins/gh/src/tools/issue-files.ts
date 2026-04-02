@@ -4,14 +4,14 @@ import { stringify, parse } from 'yaml';
 
 /** Frontmatter fields stored in issue markdown files */
 export interface IssueFrontmatter {
-  number: number;
+  number?: number;
   title: string;
   state: string;
   labels: string[];
   milestone: number | null;
   assignees: string[];
-  url: string;
-  pulled_at: string;
+  url?: string;
+  pulled_at?: string;
 }
 
 /** Result of parsing an issue markdown file */
@@ -57,8 +57,8 @@ export function parseIssueFile(content: string): ParsedIssueFile {
   }
 
   const frontmatter = parse(match[1]) as IssueFrontmatter;
-  if (typeof frontmatter.number !== 'number') {
-    throw new Error('Invalid issue file: missing "number" in frontmatter');
+  if (typeof frontmatter.title !== 'string' || !frontmatter.title) {
+    throw new Error('Invalid issue file: missing "title" in frontmatter');
   }
 
   // Trim trailing newline added by serializeIssue
@@ -210,14 +210,17 @@ export async function resolveIssuePaths(path: string): Promise<string[]> {
   if (s.isFile()) return [path];
   if (s.isDirectory()) {
     const entries = await readdir(path);
-    return entries
+    const numbered = entries
       .filter(e => /^issue-\d+\.md$/.test(e))
       .sort((a, b) => {
         const numA = parseInt(a.match(/issue-(\d+)/)?.[1] ?? '0');
         const numB = parseInt(b.match(/issue-(\d+)/)?.[1] ?? '0');
         return numA - numB;
-      })
-      .map(e => join(path, e));
+      });
+    const newIssues = entries
+      .filter(e => /^issue-new.*\.md$/.test(e))
+      .sort();
+    return [...numbered, ...newIssues].map(e => join(path, e));
   }
   throw new Error(`Path is neither a file nor directory: ${path}`);
 }
