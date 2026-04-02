@@ -21,15 +21,15 @@ parse_input() {
 }
 
 # Read state file into SUPPORTED and ORIGINAL_COLOR globals.
+# Uses grep/cut instead of source to avoid shell injection.
 # Returns 1 if state file doesn't exist.
 read_state() {
     if [[ ! -f "${STATE_FILE}" ]]; then
         return 1
     fi
-    # shellcheck source=/dev/null
-    source "${STATE_FILE}"
-    SUPPORTED="${supported:-false}"
-    ORIGINAL_COLOR="${original_color:-}"
+    SUPPORTED=$(grep '^supported=' "${STATE_FILE}" | cut -d= -f2-)
+    ORIGINAL_COLOR=$(grep '^original_color=' "${STATE_FILE}" | cut -d= -f2-)
+    SUPPORTED="${SUPPORTED:-false}"
 }
 
 # Write state to state file with restrictive permissions.
