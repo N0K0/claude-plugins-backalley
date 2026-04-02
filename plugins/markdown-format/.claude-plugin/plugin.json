@@ -1,0 +1,9 @@
+{
+  "name": "markdown-format",
+  "description": "Auto-fix common markdown formatting issues in .md files",
+  "author": {
+    "name": "nikolas"
+  },
+  "version": "0.1.0",
+  "keywords": ["markdown", "formatting", "hooks"]
+}
