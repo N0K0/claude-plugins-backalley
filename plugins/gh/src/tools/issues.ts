@@ -221,6 +221,14 @@ export const tools: ToolDef[] = [
           const content = await Bun.file(filePath).text();
           const { frontmatter, body } = parseIssueFile(content);
 
+          if (frontmatter.number === undefined) {
+            errors.push({
+              file: filePath.split('/').pop(),
+              error: 'Skipped: new-issue file (no number). Not yet pushed to GitHub.',
+            });
+            continue;
+          }
+
           const patchBody: Record<string, unknown> = {
             title: frontmatter.title,
             state: frontmatter.state,
@@ -267,6 +275,14 @@ export const tools: ToolDef[] = [
         try {
           const content = await Bun.file(filePath).text();
           const { frontmatter, body } = parseIssueFile(content);
+
+          if (frontmatter.number === undefined) {
+            errors.push({
+              file: filePath.split('/').pop(),
+              error: 'Skipped: new-issue file has no number (not yet pushed to GitHub)',
+            });
+            continue;
+          }
 
           const remote = await api(`/repos/${ctx.owner}/${ctx.repo}/issues/${frontmatter.number}`);
 
