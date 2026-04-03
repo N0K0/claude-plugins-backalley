@@ -24,11 +24,18 @@ All tools in: `tools/issues.ts` (standalone CRUD), `tools/prs.ts`, `tools/labels
 
 ### Kept As-Is
 
-`server.ts` (updated imports), `gh.ts`, `state.ts`.
+`server.ts` (updated imports), `state.ts`.
 
 ### Modified
 
-`issue-files.ts` — extended for comment serialization/parsing.
+- `issue-files.ts` — extended for comment serialization/parsing.
+- `gh.ts` — remove unused `graphql()` function (no remaining tools use it).
+
+### Cleanup
+
+- Remove `paginationParams` from `types.ts` (no remaining paginated API tools).
+- Delete test files for removed tools; update `issue-files.test.ts`, `pull-existing.test.ts`, `push-changed.test.ts` for comment handling.
+- Update `plugins/gh/skills/create-issue/SKILL.md` example frontmatter if the file format changes affect it.
 
 ## Issue File Format
 
@@ -65,8 +72,34 @@ A new comment to be created on push.
 
 - `## Comments` section is always last, separated from body by a blank line.
 - Each comment heading: `### @author — timestamp <!-- id:NNNNN -->`.
+- The timestamp is the comment's `created_at` from the GitHub API. `updated_at` is not tracked in the heading.
 - New comments use `### @author — new` (no id, no timestamp). Push creates them and rewrites the heading with the real id and timestamp.
 - If there are no comments, the `## Comments` section is omitted.
+
+### Parsing Contract
+
+`parseIssueFile` returns an updated type:
+
+```typescript
+interface Comment {
+  id?: number;       // GitHub comment ID — absent for new comments
+  author: string;    // GitHub username
+  timestamp?: string; // ISO 8601 created_at — absent for new comments
+  body: string;      // Comment body markdown
+}
+
+interface ParsedIssueFile {
+  frontmatter: IssueFrontmatter;
+  body: string;       // Issue body, excluding ## Comments section
+  comments: Comment[];
+}
+```
+
+The body/comments split is done by finding the **last** `## Comments` line that is preceded by a blank line. Everything before it is the body; everything after is parsed into `Comment[]`. Known limitation: if an issue body contains a literal `## Comments` line preceded by a blank line, the parser will incorrectly split there. This is acceptable for developer tooling — avoid using that exact heading in issue bodies.
+
+### Comment Edit Failure Handling
+
+When pushing an edited comment that the authenticated user does not own, the PATCH will return a 403. This is reported in the push result's `errors` array (alongside the comment id and author) and the local edit is left as-is. The user can then decide whether to revert or post a new comment instead.
 
 ## Pull Logic
 
@@ -97,9 +130,25 @@ The auto-sync hook (session start) re-pulls comments along with the issue.
 - New remote comments (not yet pulled).
 - Unified diff format for comment body changes.
 
+## Hooks
+
+Both existing hooks must be updated for comment-aware serialization/parsing.
+
+### Session-start hook (`pull-existing.ts`)
+
+- Currently: fetches each `issue-{N}.md` file's metadata + body from GitHub, rewrites locally.
+- After: also fetches comments and writes the `## Comments` section. Uses the same serialization as `issue_pull`.
+
+### Stop hook (`push-changed.ts`)
+
+- Currently: for modified issues, PATCHes metadata + body to GitHub.
+- After: also handles comment sync (new and edited comments), using the same logic as `issue_push`.
+- **New comments are pushed** — if a user ends a session with unpushed new comments, the hook posts them. This matches the existing behavior where body edits are auto-pushed on session end.
+- Conflict detection: existing issue-level `pulled_at` check applies. No per-comment conflict detection — if a comment was edited both locally and remotely since last pull, the local version wins on push.
+
 ## Local Issue Search
 
-`issue_search` reads `.issues/*.md` files and filters by frontmatter fields.
+`issue_search` reads `.issues/*.md` files and filters by frontmatter fields. It does **not** go through `resolveRepo()` — it is purely local and bypasses repo resolution in `server.ts` (same pattern as `detect_repo`).
 
 ### Parameters
 
@@ -114,6 +163,10 @@ The auto-sync hook (session start) re-pulls comments along with the issue.
 List of matching issues with frontmatter fields only (number, title, state, labels, milestone, assignees, url). No body content.
 
 No indexing or caching — brute-force read and filter is sufficient for typical `.issues/` folder sizes.
+
+### Intentionally Dropped Search Capabilities
+
+The old `issue_search` queried GitHub's Search API, which supported full-text body search, date ranges, comment count filters, and other advanced operators. These are intentionally dropped. For advanced queries, use `gh search issues` or `gh issue list` directly.
 
 ## Existing Functionality Preserved
 
