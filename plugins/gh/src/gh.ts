@@ -80,6 +80,24 @@ export async function api(
 }
 
 /**
+ * Fetch all comments for an issue, paginated.
+ */
+export async function fetchAllComments(owner: string, repo: string, issueNumber: number): Promise<any[]> {
+  const comments: any[] = [];
+  let page = 1;
+  while (true) {
+    const batch = await api(`/repos/${owner}/${repo}/issues/${issueNumber}/comments`, {
+      fields: { per_page: '100', page: String(page) },
+    });
+    if (!Array.isArray(batch) || batch.length === 0) break;
+    comments.push(...batch);
+    if (batch.length < 100) break;
+    page++;
+  }
+  return comments;
+}
+
+/**
  * Call gh api graphql. Returns parsed JSON data field.
  */
 export async function graphql(
