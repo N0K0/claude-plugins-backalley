@@ -67,6 +67,10 @@ export function serializeIssue(raw: any, comments?: any[]): string {
   return result;
 }
 
+/**
+ * Serialize parsed Comment[] back to the ## Comments markdown section.
+ * Used when rewriting a file after push (where we have Comment objects, not raw API objects).
+ */
 export function serializeComments(comments: Comment[]): string {
   if (comments.length === 0) return '';
   let result = '\n## Comments\n';
@@ -83,6 +87,7 @@ export function serializeComments(comments: Comment[]): string {
 /**
  * Parse a markdown file with YAML frontmatter into structured data.
  * Expects `---` delimiters around the YAML block.
+ * Splits body from ## Comments section (last occurrence preceded by blank line).
  */
 export function parseIssueFile(content: string): ParsedIssueFile {
   const match = content.match(/^---\n([\s\S]*?)\n---\n\n?([\s\S]*)$/);
