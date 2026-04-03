@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { rename } from 'node:fs/promises';
 import { findProjectRoot, findIssueFiles, isModifiedSince } from './shared.js';
-import { detectRepo, api } from '../gh.js';
+import { detectRepo, api, fetchAllComments } from '../gh.js';
 import { parseIssueFile, serializeIssue } from '../tools/issue-files.js';
 
 interface PushStats {
@@ -66,7 +66,7 @@ async function main() {
   for (const file of numbered) {
     try {
       const content = await Bun.file(file.path).text();
-      const { frontmatter, body } = parseIssueFile(content);
+      const { frontmatter, body, comments } = parseIssueFile(content);
 
       if (!frontmatter.number) continue; // safety check
 
@@ -95,8 +95,38 @@ async function main() {
         },
       });
 
-      // Rewrite file with updated pulled_at (resets mtime)
-      const refreshed = serializeIssue(updated);
+      // Sync comments
+      const remoteComments = await fetchAllComments(ctx.owner, ctx.repo, frontmatter.number);
+      const remoteById = new Map(remoteComments.map((c: any) => [c.id, c]));
+
+      for (const local of comments) {
+        if (!local.id) {
+          try {
+            await api(
+              `/repos/${ctx.owner}/${ctx.repo}/issues/${frontmatter.number}/comments`,
+              { method: 'POST', body: { body: local.body } },
+            );
+          } catch (err: any) {
+            stats.skipped.push(`#${frontmatter.number} comment: ${err.message}`);
+          }
+        } else {
+          const rc = remoteById.get(local.id);
+          if (rc && rc.body !== local.body) {
+            try {
+              await api(
+                `/repos/${ctx.owner}/${ctx.repo}/issues/comments/${local.id}`,
+                { method: 'PATCH', body: { body: local.body } },
+              );
+            } catch (err: any) {
+              stats.skipped.push(`comment ${local.id} by @${local.author}: ${err.message}`);
+            }
+          }
+        }
+      }
+
+      // Rewrite file with fresh state including comments
+      const freshComments = await fetchAllComments(ctx.owner, ctx.repo, frontmatter.number);
+      const refreshed = serializeIssue(updated, freshComments);
       await Bun.write(file.path, refreshed);
       stats.pushed++;
     } catch (err: any) {
@@ -108,7 +138,7 @@ async function main() {
   for (const file of newIssues) {
     try {
       const content = await Bun.file(file.path).text();
-      const { frontmatter, body } = parseIssueFile(content);
+      const { frontmatter, body, comments } = parseIssueFile(content);
 
       if (!frontmatter.title) {
         stats.skipped.push(`${file.name} (missing title)`);
@@ -125,8 +155,23 @@ async function main() {
         body: createBody,
       });
 
-      // Write number to file FIRST (crash safety — prevents re-creation)
-      const serialized = serializeIssue(created);
+      // Post any comments
+      for (const c of comments) {
+        if (!c.id) {
+          try {
+            await api(
+              `/repos/${ctx.owner}/${ctx.repo}/issues/${created.number}/comments`,
+              { method: 'POST', body: { body: c.body } },
+            );
+          } catch (err: any) {
+            stats.skipped.push(`${file.name} comment: ${err.message}`);
+          }
+        }
+      }
+
+      // Re-fetch with comments and rewrite (crash safety — write before rename)
+      const freshComments = await fetchAllComments(ctx.owner, ctx.repo, created.number);
+      const serialized = serializeIssue(created, freshComments);
       await Bun.write(file.path, serialized);
 
       // Then rename

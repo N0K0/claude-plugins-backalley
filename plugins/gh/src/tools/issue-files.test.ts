@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'bun:test';
-import { parseIssueFile, serializeIssue, resolveIssuePaths } from './issue-files';
+import { parseIssueFile, serializeIssue, serializeComments, resolveIssuePaths, Comment } from './issue-files';
 import { mkdir, writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -94,5 +94,220 @@ describe('resolveIssuePaths', () => {
     const paths = await resolveIssuePaths(f);
     expect(paths).toEqual([f]);
     await rm(tmpDir, { recursive: true });
+  });
+});
+
+describe('parseIssueFile with comments', () => {
+  test('parses issue with comments section', () => {
+    const content = `---
+number: 42
+title: "Test issue"
+state: open
+labels: []
+milestone: null
+assignees: []
+---
+
+Body content here.
+
+## Comments
+
+### @alice — 2026-03-28T10:18:06Z <!-- id:12345 -->
+
+First comment.
+
+### @bob — 2026-03-29T14:22:00Z <!-- id:12346 -->
+
+Second comment.
+`;
+    const result = parseIssueFile(content);
+    expect(result.body).toBe('Body content here.');
+    expect(result.comments).toHaveLength(2);
+    expect(result.comments[0]).toEqual({
+      id: 12345,
+      author: 'alice',
+      timestamp: '2026-03-28T10:18:06Z',
+      body: 'First comment.',
+    });
+    expect(result.comments[1]).toEqual({
+      id: 12346,
+      author: 'bob',
+      timestamp: '2026-03-29T14:22:00Z',
+      body: 'Second comment.',
+    });
+  });
+
+  test('parses new comment (no id, no timestamp)', () => {
+    const content = `---
+number: 42
+title: "Test"
+state: open
+labels: []
+milestone: null
+assignees: []
+---
+
+Body.
+
+## Comments
+
+### @alice — new
+
+New comment text.
+`;
+    const result = parseIssueFile(content);
+    expect(result.comments).toHaveLength(1);
+    expect(result.comments[0]).toEqual({
+      author: 'alice',
+      body: 'New comment text.',
+    });
+  });
+
+  test('parses issue without comments section', () => {
+    const content = `---
+number: 42
+title: "Test"
+state: open
+labels: []
+milestone: null
+assignees: []
+---
+
+Body only.`;
+    const result = parseIssueFile(content);
+    expect(result.body).toBe('Body only.');
+    expect(result.comments).toEqual([]);
+  });
+
+  test('parses empty body with comments', () => {
+    const content = `---
+number: 42
+title: "Test"
+state: open
+labels: []
+milestone: null
+assignees: []
+---
+
+## Comments
+
+### @alice — 2026-03-28T10:00:00Z <!-- id:100 -->
+
+A comment on an empty-body issue.
+`;
+    const result = parseIssueFile(content);
+    expect(result.body).toBe('');
+    expect(result.comments).toHaveLength(1);
+    expect(result.comments[0].id).toBe(100);
+  });
+
+  test('handles multi-line comment bodies', () => {
+    const content = `---
+number: 42
+title: "Test"
+state: open
+labels: []
+milestone: null
+assignees: []
+---
+
+Body.
+
+## Comments
+
+### @alice — 2026-03-28T10:00:00Z <!-- id:100 -->
+
+Line one.
+
+Line two with **bold**.
+
+\`\`\`js
+code block
+\`\`\`
+`;
+    const result = parseIssueFile(content);
+    expect(result.comments[0].body).toBe(
+      'Line one.\n\nLine two with **bold**.\n\n```js\ncode block\n```'
+    );
+  });
+});
+
+describe('serializeIssue with comments', () => {
+  test('serializes issue with comments', () => {
+    const raw = {
+      number: 42,
+      title: 'Test issue',
+      state: 'open',
+      labels: [{ name: 'bug' }],
+      milestone: null,
+      assignees: [],
+      html_url: 'https://github.com/owner/repo/issues/42',
+      body: 'Issue body.',
+    };
+    const comments = [
+      { id: 100, user: { login: 'alice' }, created_at: '2026-03-28T10:00:00Z', body: 'First comment.' },
+      { id: 101, user: { login: 'bob' }, created_at: '2026-03-29T14:00:00Z', body: 'Second comment.' },
+    ];
+    const result = serializeIssue(raw, comments);
+    expect(result).toContain('## Comments');
+    expect(result).toContain('### @alice — 2026-03-28T10:00:00Z <!-- id:100 -->');
+    expect(result).toContain('First comment.');
+    expect(result).toContain('### @bob — 2026-03-29T14:00:00Z <!-- id:101 -->');
+    expect(result).toContain('Second comment.');
+  });
+
+  test('omits comments section when no comments', () => {
+    const raw = {
+      number: 1, title: 'No comments', state: 'open',
+      labels: [], milestone: null, assignees: [],
+      html_url: 'https://github.com/owner/repo/issues/1', body: 'Body.',
+    };
+    const result = serializeIssue(raw, []);
+    expect(result).not.toContain('## Comments');
+  });
+
+  test('backward compat: serializeIssue without comments arg', () => {
+    const raw = {
+      number: 1, title: 'Compat', state: 'open',
+      labels: [], milestone: null, assignees: [],
+      html_url: 'https://github.com/owner/repo/issues/1', body: 'Body.',
+    };
+    const result = serializeIssue(raw);
+    expect(result).not.toContain('## Comments');
+  });
+
+  test('roundtrip: serializeIssue then parseIssueFile', () => {
+    const raw = {
+      number: 42, title: 'Roundtrip', state: 'open',
+      labels: [{ name: 'bug' }], milestone: null, assignees: [],
+      html_url: 'https://github.com/o/r/issues/42', body: 'Body text.',
+    };
+    const comments = [
+      { id: 200, user: { login: 'alice' }, created_at: '2026-03-28T10:00:00Z', body: 'Comment.' },
+    ];
+    const serialized = serializeIssue(raw, comments);
+    const parsed = parseIssueFile(serialized);
+    expect(parsed.body).toBe('Body text.');
+    expect(parsed.comments).toHaveLength(1);
+    expect(parsed.comments[0].id).toBe(200);
+    expect(parsed.comments[0].body).toBe('Comment.');
+  });
+});
+
+describe('serializeComments', () => {
+  test('serializes existing and new comments', () => {
+    const comments: Comment[] = [
+      { id: 100, author: 'alice', timestamp: '2026-03-28T10:00:00Z', body: 'Existing.' },
+      { author: 'bob', body: 'New comment.' },
+    ];
+    const result = serializeComments(comments);
+    expect(result).toContain('### @alice — 2026-03-28T10:00:00Z <!-- id:100 -->');
+    expect(result).toContain('Existing.');
+    expect(result).toContain('### @bob — new');
+    expect(result).toContain('New comment.');
+  });
+
+  test('returns empty string for no comments', () => {
+    expect(serializeComments([])).toBe('');
   });
 });

@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { findProjectRoot, findIssueFiles } from './shared.js';
-import { detectRepo, api } from '../gh.js';
+import { detectRepo, api, fetchAllComments } from '../gh.js';
 import { serializeIssue } from '../tools/issue-files.js';
 
 interface PullStats {
@@ -62,7 +62,8 @@ async function main() {
         stats.warnings.push(`#${file.number}: is a pull request, skipped`);
         continue;
       }
-      const content = serializeIssue(issue);
+      const comments = await fetchAllComments(ctx.owner, ctx.repo, file.number);
+      const content = serializeIssue(issue, comments);
       await Bun.write(file.path, content);
       stats.pulled++;
     } catch (err: any) {

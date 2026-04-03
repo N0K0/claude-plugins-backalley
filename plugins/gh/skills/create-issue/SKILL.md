@@ -44,3 +44,25 @@ Only `title` is required. All other fields are optional.
 - The `.issues/` directory must exist (create it with `issue_pull` first, or `mkdir .issues`)
 - Auto-push happens on the Stop hook (after each Claude turn)
 - You can also push manually: call `issue_push` with the `.issues/` directory path
+
+## Adding comments to new issues
+
+You can add comments to a new issue file before pushing. Append a `## Comments` section after the body:
+
+```markdown
+---
+title: "New issue"
+state: open
+labels: []
+---
+
+Issue body here.
+
+## Comments
+
+### @username — new
+
+First comment on the new issue.
+```
+
+Comments with `— new` headings will be posted as comments on the issue after it is created.
