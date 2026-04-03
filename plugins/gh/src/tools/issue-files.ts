@@ -14,10 +14,19 @@ export interface IssueFrontmatter {
   pulled_at?: string;
 }
 
+/** A single comment on an issue */
+export interface Comment {
+  id?: number;        // GitHub comment ID — absent for new comments
+  author: string;     // GitHub username
+  timestamp?: string; // ISO 8601 created_at — absent for new comments
+  body: string;       // Comment body markdown
+}
+
 /** Result of parsing an issue markdown file */
 export interface ParsedIssueFile {
   frontmatter: IssueFrontmatter;
   body: string;
+  comments: Comment[];
 }
 
 /** Build the file path for an issue in a directory */
@@ -61,10 +70,70 @@ export function parseIssueFile(content: string): ParsedIssueFile {
     throw new Error('Invalid issue file: missing "title" in frontmatter');
   }
 
-  // Trim trailing newline added by serializeIssue
-  const body = match[2].replace(/\n$/, '');
+  const rawContent = match[2].replace(/\n$/, '');
 
-  return { frontmatter, body };
+  const commentMarker = '\n\n## Comments\n';
+  const commentSplit = rawContent.lastIndexOf(commentMarker);
+  let body: string;
+  let commentsRaw: string;
+
+  if (commentSplit !== -1) {
+    body = rawContent.slice(0, commentSplit);
+    commentsRaw = rawContent.slice(commentSplit + commentMarker.length);
+  } else if (rawContent.startsWith('## Comments\n')) {
+    body = '';
+    commentsRaw = rawContent.slice('## Comments\n'.length);
+  } else {
+    return { frontmatter, body: rawContent, comments: [] };
+  }
+
+  const comments = parseComments(commentsRaw);
+  return { frontmatter, body, comments };
+}
+
+const COMMENT_HEADING_RE = /^### @(\S+) — (.+)$/;
+const COMMENT_ID_RE = /<!-- id:(\d+) -->/;
+
+function parseComments(raw: string): Comment[] {
+  const comments: Comment[] = [];
+  const lines = raw.split('\n');
+  let current: Comment | null = null;
+  const bodyLines: string[] = [];
+
+  function flushCurrent() {
+    if (current) {
+      current.body = bodyLines.join('\n').trim();
+      comments.push(current);
+      bodyLines.length = 0;
+    }
+  }
+
+  for (const line of lines) {
+    const headingMatch = line.match(COMMENT_HEADING_RE);
+    if (headingMatch) {
+      flushCurrent();
+      const author = headingMatch[1];
+      const rest = headingMatch[2];
+      const idMatch = rest.match(COMMENT_ID_RE);
+
+      if (rest.trim() === 'new') {
+        current = { author, body: '' };
+      } else {
+        const timestamp = rest.replace(COMMENT_ID_RE, '').trim();
+        current = {
+          id: idMatch ? parseInt(idMatch[1]) : undefined,
+          author,
+          timestamp: timestamp || undefined,
+          body: '',
+        };
+      }
+    } else if (current) {
+      bodyLines.push(line);
+    }
+  }
+
+  flushCurrent();
+  return comments;
 }
 
 /**
