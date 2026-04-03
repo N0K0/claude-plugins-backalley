@@ -98,31 +98,6 @@ export async function fetchAllComments(owner: string, repo: string, issueNumber:
 }
 
 /**
- * Call gh api graphql. Returns parsed JSON data field.
- */
-export async function graphql(
-  query: string,
-  variables: Record<string, unknown> = {}
-): Promise<any> {
-  const args = ['api', 'graphql'];
-  args.push('-f', `query=${query}`);
-
-  for (const [key, value] of Object.entries(variables)) {
-    if (typeof value === 'number' || typeof value === 'boolean') {
-      args.push('-F', `${key}=${value}`);
-    } else {
-      args.push('-f', `${key}=${String(value)}`);
-    }
-  }
-
-  const result = await exec(args);
-  if (result.errors?.length) {
-    throw new Error(result.errors.map((e: any) => e.message).join('; '));
-  }
-  return result.data;
-}
-
-/**
  * Resolve repo context: use provided owner/repo or fall back to defaults.
  */
 export function resolveRepo(
