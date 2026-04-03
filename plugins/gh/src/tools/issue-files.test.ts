@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'bun:test';
-import { parseIssueFile, serializeIssue, resolveIssuePaths, Comment } from './issue-files';
+import { parseIssueFile, serializeIssue, serializeComments, resolveIssuePaths, Comment } from './issue-files';
 import { mkdir, writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -229,5 +229,85 @@ code block
     expect(result.comments[0].body).toBe(
       'Line one.\n\nLine two with **bold**.\n\n```js\ncode block\n```'
     );
+  });
+});
+
+describe('serializeIssue with comments', () => {
+  test('serializes issue with comments', () => {
+    const raw = {
+      number: 42,
+      title: 'Test issue',
+      state: 'open',
+      labels: [{ name: 'bug' }],
+      milestone: null,
+      assignees: [],
+      html_url: 'https://github.com/owner/repo/issues/42',
+      body: 'Issue body.',
+    };
+    const comments = [
+      { id: 100, user: { login: 'alice' }, created_at: '2026-03-28T10:00:00Z', body: 'First comment.' },
+      { id: 101, user: { login: 'bob' }, created_at: '2026-03-29T14:00:00Z', body: 'Second comment.' },
+    ];
+    const result = serializeIssue(raw, comments);
+    expect(result).toContain('## Comments');
+    expect(result).toContain('### @alice — 2026-03-28T10:00:00Z <!-- id:100 -->');
+    expect(result).toContain('First comment.');
+    expect(result).toContain('### @bob — 2026-03-29T14:00:00Z <!-- id:101 -->');
+    expect(result).toContain('Second comment.');
+  });
+
+  test('omits comments section when no comments', () => {
+    const raw = {
+      number: 1, title: 'No comments', state: 'open',
+      labels: [], milestone: null, assignees: [],
+      html_url: 'https://github.com/owner/repo/issues/1', body: 'Body.',
+    };
+    const result = serializeIssue(raw, []);
+    expect(result).not.toContain('## Comments');
+  });
+
+  test('backward compat: serializeIssue without comments arg', () => {
+    const raw = {
+      number: 1, title: 'Compat', state: 'open',
+      labels: [], milestone: null, assignees: [],
+      html_url: 'https://github.com/owner/repo/issues/1', body: 'Body.',
+    };
+    const result = serializeIssue(raw);
+    expect(result).not.toContain('## Comments');
+  });
+
+  test('roundtrip: serializeIssue then parseIssueFile', () => {
+    const raw = {
+      number: 42, title: 'Roundtrip', state: 'open',
+      labels: [{ name: 'bug' }], milestone: null, assignees: [],
+      html_url: 'https://github.com/o/r/issues/42', body: 'Body text.',
+    };
+    const comments = [
+      { id: 200, user: { login: 'alice' }, created_at: '2026-03-28T10:00:00Z', body: 'Comment.' },
+    ];
+    const serialized = serializeIssue(raw, comments);
+    const parsed = parseIssueFile(serialized);
+    expect(parsed.body).toBe('Body text.');
+    expect(parsed.comments).toHaveLength(1);
+    expect(parsed.comments[0].id).toBe(200);
+    expect(parsed.comments[0].body).toBe('Comment.');
+  });
+});
+
+describe('serializeComments', () => {
+  test('serializes existing and new comments', () => {
+    const comments: Comment[] = [
+      { id: 100, author: 'alice', timestamp: '2026-03-28T10:00:00Z', body: 'Existing.' },
+      { author: 'bob', body: 'New comment.' },
+    ];
+    const result = serializeComments(comments);
+    expect(result).toContain('### @alice — 2026-03-28T10:00:00Z <!-- id:100 -->');
+    expect(result).toContain('Existing.');
+    expect(result).toContain('### @bob — new');
+    expect(result).toContain('New comment.');
+  });
+
+  test('returns empty string for no comments', () => {
+    expect(serializeComments([])).toBe('');
   });
 });

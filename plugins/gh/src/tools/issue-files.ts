@@ -38,7 +38,7 @@ export function issueFilePath(dir: string, number: number): string {
  * Serialize a raw GitHub API issue object into markdown with YAML frontmatter.
  * Takes the raw API response (pre-slim) and extracts fields internally.
  */
-export function serializeIssue(raw: any): string {
+export function serializeIssue(raw: any, comments?: any[]): string {
   const frontmatter: IssueFrontmatter = {
     number: raw.number,
     title: raw.title,
@@ -52,7 +52,32 @@ export function serializeIssue(raw: any): string {
 
   const yamlStr = stringify(frontmatter, { lineWidth: 0 });
   const body = raw.body ?? '';
-  return `---\n${yamlStr}---\n\n${body}\n`;
+  let result = `---\n${yamlStr}---\n\n${body}\n`;
+
+  if (comments && comments.length > 0) {
+    result += '\n## Comments\n';
+    for (const c of comments) {
+      const author = c.user?.login ?? c.user ?? 'unknown';
+      const timestamp = c.created_at;
+      const id = c.id;
+      result += `\n### @${author} — ${timestamp} <!-- id:${id} -->\n\n${c.body}\n`;
+    }
+  }
+
+  return result;
+}
+
+export function serializeComments(comments: Comment[]): string {
+  if (comments.length === 0) return '';
+  let result = '\n## Comments\n';
+  for (const c of comments) {
+    if (c.id !== undefined && c.timestamp) {
+      result += `\n### @${c.author} — ${c.timestamp} <!-- id:${c.id} -->\n\n${c.body}\n`;
+    } else {
+      result += `\n### @${c.author} — new\n\n${c.body}\n`;
+    }
+  }
+  return result;
 }
 
 /**
