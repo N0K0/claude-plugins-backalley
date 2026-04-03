@@ -60,15 +60,69 @@ read_state() {
     SUPPORTED="${SUPPORTED:-false}"
 }
 
-# Write state to state file with restrictive permissions.
+# Write state to state file atomically with restrictive permissions.
+# Uses tmp+mv to prevent partial reads by concurrent hooks.
 write_state() {
     local sup="$1"
     local color="$2"
-    (umask 077; cat > "${STATE_FILE}" <<STATEEOF
+    local pid="${3:-}"
+    local tmp="${STATE_FILE}.tmp.$$"
+    (umask 077; cat > "$tmp" <<STATEEOF
 supported=${sup}
 original_color=${color}
+loop_pid=${pid}
 STATEEOF
     )
+    mv "$tmp" "${STATE_FILE}"
+}
+
+# Update only the loop_pid field in the state file atomically.
+update_loop_pid() {
+    local state_file="$1"
+    local new_pid="$2"
+    local sup orig
+    sup=$(grep '^supported=' "$state_file" 2>/dev/null | cut -d= -f2-)
+    orig=$(grep '^original_color=' "$state_file" 2>/dev/null | cut -d= -f2-)
+    local tmp="${state_file}.tmp.$$"
+    (umask 077; cat > "$tmp" <<STATEEOF
+supported=${sup}
+original_color=${orig}
+loop_pid=${new_pid}
+STATEEOF
+    )
+    mv "$tmp" "$state_file"
+}
+
+# Kill the background OSC loop if running. Waits up to 250ms for death.
+kill_loop() {
+    local state_file="$1"
+    local pid
+    pid=$(grep '^loop_pid=' "$state_file" 2>/dev/null | cut -d= -f2-)
+    if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+        kill "$pid" 2>/dev/null
+        local i
+        for i in 1 2 3 4 5; do
+            kill -0 "$pid" 2>/dev/null || break
+            sleep 0.05
+        done
+    fi
+    update_loop_pid "$state_file" ""
+}
+
+# Spawn a detached background loop that writes OSC 11 every 200ms.
+# The loop exits when /dev/tty fails or when killed by kill_loop.
+start_loop() {
+    local color="$1"
+    local state_file="$2"
+    ( trap 'exit 0' TERM
+      while true; do
+          printf '\e]11;%s\a' "$color" > /dev/tty 2>/dev/null || exit 1
+          sleep 0.2
+      done
+    ) </dev/null >/dev/null 2>&1 &
+    local pid=$!
+    disown "$pid" 2>/dev/null
+    update_loop_pid "$state_file" "$pid"
 }
 
 # Emit empty JSON to stdout (required hook output).
