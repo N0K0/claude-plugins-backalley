@@ -8,7 +8,7 @@
   "plugins": [
     {
       "name": "gh",
-      "description": "MCP server for GitHub CLI — structured tool access to Issues, Projects, PRs, Labels, and Milestones",
+      "description": "MCP server for GitHub CLI — issue pull/push/diff with comment sync and local search",
       "author": {
         "name": "nikolas"
       },
