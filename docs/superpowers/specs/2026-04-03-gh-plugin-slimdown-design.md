@@ -99,7 +99,7 @@ The body/comments split is done by finding the **last** `## Comments` line that 
 
 ### Comment Edit Failure Handling
 
-When pushing an edited comment that the authenticated user does not own, the PATCH will return a 403. This is reported in the push result's `errors` array (alongside the comment id and author) and the local edit is left as-is. The user can then decide whether to revert or post a new comment instead.
+When pushing an edited comment that the authenticated user does not own, the PATCH will return a 403. This is added to the existing `skipped` array in the push result (e.g., `"comment 12345 by @bob: permission denied"`). The local edit is left as-is. The user can then decide whether to revert or post a new comment instead.
 
 ## Pull Logic
 
@@ -144,7 +144,7 @@ Both existing hooks must be updated for comment-aware serialization/parsing.
 - Currently: for modified issues, PATCHes metadata + body to GitHub.
 - After: also handles comment sync (new and edited comments), using the same logic as `issue_push`.
 - **New comments are pushed** — if a user ends a session with unpushed new comments, the hook posts them. This matches the existing behavior where body edits are auto-pushed on session end.
-- Conflict detection: existing issue-level `pulled_at` check applies. No per-comment conflict detection — if a comment was edited both locally and remotely since last pull, the local version wins on push.
+- Conflict detection: existing issue-level `pulled_at` check applies. No per-comment conflict detection — if a comment was edited both locally and remotely since last pull, the local version wins on push. The next pull will re-fetch the pushed version, so no data is permanently lost.
 
 ## Local Issue Search
 
@@ -152,7 +152,7 @@ Both existing hooks must be updated for comment-aware serialization/parsing.
 
 ### Parameters
 
-- `path` — directory to search (defaults to `.issues/`).
+- `path` — absolute path to the issues directory. No default — caller must provide the path (typically from a prior `detect_repo` or known project root).
 - `state` — `open`, `closed`, or `all` (default: `open`).
 - `labels` — comma-separated list, matches issues that have all specified labels.
 - `milestone` — milestone number or `none`.
