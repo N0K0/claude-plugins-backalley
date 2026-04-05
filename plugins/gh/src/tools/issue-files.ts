@@ -14,10 +14,19 @@ export interface IssueFrontmatter {
   pulled_at?: string;
 }
 
+/** A single comment on an issue */
+export interface Comment {
+  id?: number;        // GitHub comment ID — absent for new comments
+  author: string;     // GitHub username
+  timestamp?: string; // ISO 8601 created_at — absent for new comments
+  body: string;       // Comment body markdown
+}
+
 /** Result of parsing an issue markdown file */
 export interface ParsedIssueFile {
   frontmatter: IssueFrontmatter;
   body: string;
+  comments: Comment[];
 }
 
 /** Build the file path for an issue in a directory */
@@ -29,7 +38,7 @@ export function issueFilePath(dir: string, number: number): string {
  * Serialize a raw GitHub API issue object into markdown with YAML frontmatter.
  * Takes the raw API response (pre-slim) and extracts fields internally.
  */
-export function serializeIssue(raw: any): string {
+export function serializeIssue(raw: any, comments?: any[]): string {
   const frontmatter: IssueFrontmatter = {
     number: raw.number,
     title: raw.title,
@@ -43,12 +52,42 @@ export function serializeIssue(raw: any): string {
 
   const yamlStr = stringify(frontmatter, { lineWidth: 0 });
   const body = raw.body ?? '';
-  return `---\n${yamlStr}---\n\n${body}\n`;
+  let result = `---\n${yamlStr}---\n\n${body}\n`;
+
+  if (comments && comments.length > 0) {
+    result += '\n## Comments\n';
+    for (const c of comments) {
+      const author = c.user?.login ?? c.user ?? 'unknown';
+      const timestamp = c.created_at;
+      const id = c.id;
+      result += `\n### @${author} — ${timestamp} <!-- id:${id} -->\n\n${c.body}\n`;
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Serialize parsed Comment[] back to the ## Comments markdown section.
+ * Used when rewriting a file after push (where we have Comment objects, not raw API objects).
+ */
+export function serializeComments(comments: Comment[]): string {
+  if (comments.length === 0) return '';
+  let result = '\n## Comments\n';
+  for (const c of comments) {
+    if (c.id !== undefined && c.timestamp) {
+      result += `\n### @${c.author} — ${c.timestamp} <!-- id:${c.id} -->\n\n${c.body}\n`;
+    } else {
+      result += `\n### @${c.author} — new\n\n${c.body}\n`;
+    }
+  }
+  return result;
 }
 
 /**
  * Parse a markdown file with YAML frontmatter into structured data.
  * Expects `---` delimiters around the YAML block.
+ * Splits body from ## Comments section (last occurrence preceded by blank line).
  */
 export function parseIssueFile(content: string): ParsedIssueFile {
   const match = content.match(/^---\n([\s\S]*?)\n---\n\n?([\s\S]*)$/);
@@ -61,10 +100,70 @@ export function parseIssueFile(content: string): ParsedIssueFile {
     throw new Error('Invalid issue file: missing "title" in frontmatter');
   }
 
-  // Trim trailing newline added by serializeIssue
-  const body = match[2].replace(/\n$/, '');
+  const rawContent = match[2].replace(/\n$/, '');
 
-  return { frontmatter, body };
+  const commentMarker = '\n\n## Comments\n';
+  const commentSplit = rawContent.lastIndexOf(commentMarker);
+  let body: string;
+  let commentsRaw: string;
+
+  if (commentSplit !== -1) {
+    body = rawContent.slice(0, commentSplit);
+    commentsRaw = rawContent.slice(commentSplit + commentMarker.length);
+  } else if (rawContent.startsWith('## Comments\n')) {
+    body = '';
+    commentsRaw = rawContent.slice('## Comments\n'.length);
+  } else {
+    return { frontmatter, body: rawContent, comments: [] };
+  }
+
+  const comments = parseComments(commentsRaw);
+  return { frontmatter, body, comments };
+}
+
+const COMMENT_HEADING_RE = /^### @(\S+) — (.+)$/;
+const COMMENT_ID_RE = /<!-- id:(\d+) -->/;
+
+function parseComments(raw: string): Comment[] {
+  const comments: Comment[] = [];
+  const lines = raw.split('\n');
+  let current: Comment | null = null;
+  const bodyLines: string[] = [];
+
+  function flushCurrent() {
+    if (current) {
+      current.body = bodyLines.join('\n').trim();
+      comments.push(current);
+      bodyLines.length = 0;
+    }
+  }
+
+  for (const line of lines) {
+    const headingMatch = line.match(COMMENT_HEADING_RE);
+    if (headingMatch) {
+      flushCurrent();
+      const author = headingMatch[1];
+      const rest = headingMatch[2];
+      const idMatch = rest.match(COMMENT_ID_RE);
+
+      if (rest.trim() === 'new') {
+        current = { author, body: '' };
+      } else {
+        const timestamp = rest.replace(COMMENT_ID_RE, '').trim();
+        current = {
+          id: idMatch ? parseInt(idMatch[1]) : undefined,
+          author,
+          timestamp: timestamp || undefined,
+          body: '',
+        };
+      }
+    } else if (current) {
+      bodyLines.push(line);
+    }
+  }
+
+  flushCurrent();
+  return comments;
 }
 
 /**

@@ -13,19 +13,13 @@ import type { GhContext } from './gh.js';
 import type { ToolDef } from './types.js';
 
 // Import tool modules — each exports an array of ToolDef
-import { tools as issueTools } from './tools/issues.js';
-import { tools as labelTools } from './tools/labels.js';
-import { tools as milestoneTools } from './tools/milestones.js';
-import { tools as projectTools } from './tools/projects.js';
-import { tools as prTools } from './tools/prs.js';
+import { tools as issueSyncTools } from './tools/issue-sync.js';
+import { tools as issueSearchTools } from './tools/issue-search.js';
 
 // Collect all tools
 const allTools: ToolDef[] = [
-  ...issueTools,
-  ...labelTools,
-  ...milestoneTools,
-  ...projectTools,
-  ...prTools,
+  ...issueSyncTools,
+  ...issueSearchTools,
   ...repoTools,
 ];
 
@@ -55,8 +49,8 @@ server.setRequestHandler(CallToolRequestSchema, async (req) => {
   try {
     const args = tool.inputSchema.parse(req.params.arguments ?? {});
 
-    // detect_repo establishes context — it doesn't need resolveRepo()
-    if (tool.name === 'detect_repo') {
+    // detect_repo and issue_search don't need resolveRepo()
+    if (tool.name === 'detect_repo' || tool.name === 'issue_search') {
       const result = await tool.handler(args, {} as GhContext);
       return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
     }

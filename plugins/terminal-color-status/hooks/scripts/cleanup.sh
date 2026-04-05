@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SessionEnd hook: restore original background color and remove state file.
+# SessionEnd hook: kill OSC loop, restore original background color, remove state.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=_common.sh
@@ -8,7 +8,8 @@ source "${SCRIPT_DIR}/_common.sh"
 parse_input
 
 if read_state && [[ "$SUPPORTED" == "true" ]] && [[ -n "$ORIGINAL_COLOR" ]]; then
-    printf '\e]11;%s\a' "$ORIGINAL_COLOR" > /dev/tty
+    kill_loop "$STATE_FILE"
+    printf '\e]11;%s\a' "$ORIGINAL_COLOR" > /dev/tty 2>/dev/null
 fi
 
 # Clean up state file

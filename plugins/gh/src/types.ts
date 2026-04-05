@@ -6,11 +6,6 @@ export const repoParams = {
   repo: z.string().optional().describe('Repository name (defaults to current repo)'),
 };
 
-/** Pagination param */
-export const paginationParams = {
-  per_page: z.number().optional().default(30).describe('Results per page (max 100)'),
-};
-
 /** Tool definition shape for registration */
 export interface ToolDef {
   name: string;

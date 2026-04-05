@@ -2,7 +2,6 @@
 name: review
 description: "Use when an issue's checklist is fully complete — verifies tests, creates a PR, and optionally merges. Triggers on: 'review issue N', 'PR for issue N', 'merge issue N'."
 ---
-
 # Review
 
 **Announce at start:** "I'm using the review skill to create a PR for issue #N."
@@ -35,6 +34,7 @@ Do not proceed past the entry gate unless all six checks pass.
    - Base branch: `main`
 
    Example PR body:
+
    ```
    Closes #42
 
@@ -75,11 +75,14 @@ When the user says "check for feedback", "there are review comments", or similar
 1. Get the timestamp of the last commit on the current branch: `git log -1 --format=%cI` in the worktree directory. (Use last commit, not `pulled_at`, because the feedback is on the code diff, not the issue body.)
 2. Call `issue_comments_list` with `issue_number` and `since` set to that timestamp.
 3. If no new comments are returned, tell the user: "No new comments on issue #N since the last commit."
-4. If new comments are found, for each comment:
-   - Summarize what the reviewer is asking for.
-   - Make the requested code changes in the worktree.
+4. If new comments are found, follow `process:receiving-review`:
+   - Read all feedback before reacting.
+   - If any item is unclear, ask for clarification before implementing anything.
+   - Verify suggestions against codebase reality before implementing.
+   - Push back with technical reasoning if feedback is incorrect.
+   - Implement one item at a time, test each fix individually.
    - Commit each logical change with a descriptive message referencing the feedback.
-5. Re-run the project's test suite to verify nothing is broken.
+5. Re-run the project's test suite to verify nothing is broken. Use `process:verify` — run the command, read the output, then claim the result.
 6. If tests fail, fix the failures before proceeding.
 7. Push the branch: `git push` from the worktree.
 8. Present a summary of changes made to the user.
@@ -114,6 +117,10 @@ When the user says "check for feedback", "there are review comments", or similar
 ## Integration
 
 **Requires:** gh plugin (`detect_repo`, `issue_pull`, `issue_push`, `issue_search`, `issue_comments_list`, `pr_create`, `pr_merge`), git worktrees
+
+**Uses skills:**
+- `process:receiving-review` — How to handle review feedback with technical rigor
+- `process:verify` — Evidence before completion claims
 
 **Previous skill:** `execute` (completed all checklist items)
 

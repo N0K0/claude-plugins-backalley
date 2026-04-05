@@ -80,28 +80,21 @@ export async function api(
 }
 
 /**
- * Call gh api graphql. Returns parsed JSON data field.
+ * Fetch all comments for an issue, paginated.
  */
-export async function graphql(
-  query: string,
-  variables: Record<string, unknown> = {}
-): Promise<any> {
-  const args = ['api', 'graphql'];
-  args.push('-f', `query=${query}`);
-
-  for (const [key, value] of Object.entries(variables)) {
-    if (typeof value === 'number' || typeof value === 'boolean') {
-      args.push('-F', `${key}=${value}`);
-    } else {
-      args.push('-f', `${key}=${String(value)}`);
-    }
+export async function fetchAllComments(owner: string, repo: string, issueNumber: number): Promise<any[]> {
+  const comments: any[] = [];
+  let page = 1;
+  while (true) {
+    const batch = await api(`/repos/${owner}/${repo}/issues/${issueNumber}/comments`, {
+      fields: { per_page: '100', page: String(page) },
+    });
+    if (!Array.isArray(batch) || batch.length === 0) break;
+    comments.push(...batch);
+    if (batch.length < 100) break;
+    page++;
   }
-
-  const result = await exec(args);
-  if (result.errors?.length) {
-    throw new Error(result.errors.map((e: any) => e.message).join('; '));
-  }
-  return result.data;
+  return comments;
 }
 
 /**
