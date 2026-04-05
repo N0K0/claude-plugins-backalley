@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 # Stop hook: set terminal background to "ready" tint color.
-# Uses kitty IPC (Unix socket) — works during active TUI rendering.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=_common.sh
