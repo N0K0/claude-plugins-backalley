@@ -1,6 +1,6 @@
 ---
 name: parallel-agents
-description: "Use when facing 2+ independent tasks that can be worked on without shared state or sequential dependencies"
+description: "Dispatches parallel subagents for 2+ independent tasks that have no shared state or sequential dependencies. Triggers when multiple unrelated problems can be solved concurrently."
 ---
 # Dispatching Parallel Agents
 
@@ -11,21 +11,10 @@ Delegate independent tasks to specialized subagents working concurrently. Each a
 **Core principle:** Dispatch one agent per independent problem domain. Let them work concurrently.
 
 ## When to Use
-```dot
-digraph when_to_use {
-    "Multiple tasks/failures?" [shape=diamond];
-    "Are they independent?" [shape=diamond];
-    "Single agent handles all" [shape=box];
-    "Can they work in parallel?" [shape=diamond];
-    "Sequential agents" [shape=box];
-    "Parallel dispatch" [shape=box];
-
-    "Multiple tasks/failures?" -> "Are they independent?" [label="yes"];
-    "Are they independent?" -> "Single agent handles all" [label="no - related"];
-    "Are they independent?" -> "Can they work in parallel?" [label="yes"];
-    "Can they work in parallel?" -> "Parallel dispatch" [label="yes"];
-    "Can they work in parallel?" -> "Sequential agents" [label="no - shared state"];
-}
+```
+Multiple tasks? → Are they independent? → Can they run in parallel?
+  no: single agent    no: single agent       no: sequential agents
+                      yes: continue           yes: parallel dispatch
 ```
 
 **Use when:**

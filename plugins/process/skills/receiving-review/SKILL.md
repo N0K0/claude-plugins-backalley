@@ -1,12 +1,12 @@
 ---
 name: receiving-review
-description: Use when receiving code review feedback, before implementing suggestions, especially if feedback seems unclear or technically questionable - requires technical rigor and verification, not performative agreement or blind implementation
+description: "Guides technical evaluation of code review feedback before implementation. Triggers when receiving review comments, especially if feedback seems unclear or technically questionable."
 ---
 # Code Review Reception
 
 ## Overview
 
-Code review requires technical evaluation, not emotional performance.
+Evaluate code review feedback on technical merit and verify against the codebase before implementing.
 
 **Core principle:** Verify before implementing. Ask before assuming. Technical correctness over social comfort.
 
@@ -22,9 +22,9 @@ WHEN receiving code review feedback:
 6. IMPLEMENT: One item at a time, test each
 ```
 
-## Forbidden Responses
+## Avoid These Patterns
 
-**NEVER:**
+**Avoid:**
 - "You're absolutely right!"
 - "Great point!" / "Excellent feedback!"
 - "Let me implement that now" (before verification)
@@ -133,15 +133,6 @@ When feedback IS correct:
 [Just fix it and show in the code]
 ```
 
-Do not use:
-
-```
-"You're absolutely right!"
-"Great point!"
-"Thanks for catching that!"
-ANY gratitude expression
-```
-
 Actions speak. Just fix it. The code shows you heard the feedback.
 
 ## Gracefully Correcting Your Pushback
@@ -169,7 +160,7 @@ Do not write long apologies, defend why you pushed back, or over-explain. State 
 
 ## GitHub Thread Replies
 
-When replying to inline review comments on GitHub, reply in the comment thread (`gh api repos/{owner}/{repo}/pulls/{pr}/comments/{id}/replies`), not as a top-level PR comment.
+When replying to inline review comments on GitHub, reply in the PR comment thread using `gh api` with the appropriate endpoint, or use the gh plugin's tools if available. Do not post as a top-level PR comment.
 
 ## The Bottom Line
 

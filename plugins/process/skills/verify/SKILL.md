@@ -1,21 +1,16 @@
 ---
 name: verify
-description: Use when about to claim work is complete, fixed, or passing, before committing or creating PRs - requires running verification commands and confirming output before making any success claims; evidence before assertions always
+description: "Requires running verification commands and confirming output before making success claims. Triggers before committing, creating PRs, or claiming work is complete."
 ---
 # Verification Before Completion
 
 ## Overview
 
-Claiming work is complete without verification is dishonesty, not efficiency.
+Always verify before claiming completion.
 
 **Core principle:** Evidence before claims, always.
 
-**Violating the letter of this rule is violating the spirit of this rule.**
-
-## The Iron Law
-```
-NO COMPLETION CLAIMS WITHOUT FRESH VERIFICATION EVIDENCE
-```
+**Completion claims require fresh verification evidence.**
 
 If you haven't run the verification command in this message, you cannot claim it passes.
 
@@ -31,7 +26,7 @@ BEFORE claiming any status or expressing satisfaction:
    - If YES: State claim WITH evidence
 5. ONLY THEN: Make the claim
 
-Skip any step = lying, not verifying
+Skipping steps invalidates the verification.
 ```
 
 ## Common Failures
@@ -46,63 +41,61 @@ Skip any step = lying, not verifying
 | Agent completed       | VCS diff shows changes          | Agent reports "success"        |
 | Requirements met      | Line-by-line checklist          | Tests passing                  |
 
-## Red Flags - STOP
+## Red Flags and Rationalizations
 
-- Using "should", "probably", "seems to"
+Watch for these patterns that indicate verification is being skipped:
+
+- Using "should", "probably", "seems to" instead of evidence
 - Expressing satisfaction before verification ("Great!", "Perfect!", "Done!", etc.)
 - About to commit/push/PR without verification
-- Trusting agent success reports
-- Relying on partial verification
-- Thinking "just this once"
-- Any wording implying success without having run verification
+- Trusting agent success reports without independent checks
+- Relying on partial verification or extrapolation
+- Thinking "just this once" -- no exceptions
 
-## Rationalization Prevention
-
-| Excuse                                  | Reality                    |
-| --------------------------------------- | -------------------------- |
-| "Should work now"                       | RUN the verification       |
-| "I'm confident"                         | Confidence is not evidence |
-| "Just this once"                        | No exceptions              |
-| "Linter passed"                         | Linter is not compiler     |
-| "Agent said success"                    | Verify independently       |
-| "Partial check is enough"               | Partial proves nothing     |
-| "Different words so rule doesn't apply" | Spirit over letter         |
+| Excuse                    | Reality                    |
+| ------------------------- | -------------------------- |
+| "Should work now"         | Run the verification       |
+| "I'm confident"           | Confidence is not evidence |
+| "Just this once"          | No exceptions              |
+| "Linter passed"           | Linter is not compiler     |
+| "Agent said success"      | Verify independently       |
+| "Partial check is enough" | Partial proves nothing     |
 
 ## Key Patterns
 
 **Tests:**
 
 ```
-[Run test command] [See: 34/34 pass] "All tests pass"
-"Should pass now" / "Looks correct"
+Correct:   [Run test command] [See: 34/34 pass] "All tests pass"
+Incorrect: "Should pass now" / "Looks correct"
 ```
 
 **Regression tests (TDD Red-Green):**
 
 ```
-Write -> Run (pass) -> Revert fix -> Run (MUST FAIL) -> Restore -> Run (pass)
-"I've written a regression test" (without red-green verification)
+Correct:   Write -> Run (pass) -> Revert fix -> Run (MUST FAIL) -> Restore -> Run (pass)
+Incorrect: "I've written a regression test" (without red-green verification)
 ```
 
 **Build:**
 
 ```
-[Run build] [See: exit 0] "Build passes"
-"Linter passed" (linter doesn't check compilation)
+Correct:   [Run build] [See: exit 0] "Build passes"
+Incorrect: "Linter passed" (linter doesn't check compilation)
 ```
 
 **Requirements:**
 
 ```
-Re-read plan -> Create checklist -> Verify each -> Report gaps or completion
-"Tests pass, phase complete"
+Correct:   Re-read plan -> Create checklist -> Verify each -> Report gaps or completion
+Incorrect: "Tests pass, phase complete"
 ```
 
 **Agent delegation:**
 
 ```
-Agent reports success -> Check VCS diff -> Verify changes -> Report actual state
-Trust agent report
+Correct:   Agent reports success -> Check VCS diff -> Verify changes -> Report actual state
+Incorrect: Trust agent report
 ```
 
 ## Why This Matters
@@ -115,10 +108,10 @@ False completion claims waste time through:
 
 ## When To Apply
 
-**ALWAYS before:**
-- ANY variation of success/completion claims
-- ANY expression of satisfaction
-- ANY positive statement about work state
+**Apply before:**
+- Variations of success or completion claims
+- Expressions of satisfaction
+- Positive statements about work state
 - Committing, PR creation, task completion
 - Moving to next task
 - Delegating to agents
@@ -127,12 +120,10 @@ False completion claims waste time through:
 - Exact phrases
 - Paraphrases and synonyms
 - Implications of success
-- ANY communication suggesting completion/correctness
+- Communication suggesting completion or correctness
 
 ## The Bottom Line
 
 **No shortcuts for verification.**
 
-Run the command. Read the output. THEN claim the result.
-
-This is non-negotiable.
+Run the command. Read the output. Then claim the result.

@@ -1,6 +1,6 @@
 ---
 name: execute
-description: "Use when implementing an issue that has a checklist — creates a worktree, works through tasks, ticks checkboxes, and syncs to GitHub. Triggers on: 'work on issue N', 'implement issue N', 'execute issue N'."
+description: "Implements an issue's checklist by creating a worktree, working through tasks, ticking checkboxes, and syncing to GitHub. Triggers on: 'work on issue N', 'implement issue N', 'execute issue N'."
 ---
 # Execute
 
@@ -19,7 +19,7 @@ Before doing any work, run these checks in order:
 5. Parse the issue body for checklist items (`- [ ]` and `- [x]`). If there are no checklist items, stop with: "Issue #{N} has no checklist. Run plan to create one."
 6. If ALL items are already checked (`- [x]`), stop with: "All checklist items are complete. Run review to create a PR."
 
-Do not proceed past the entry gate unless all six checks pass.
+Proceed only after all six checks pass.
 
 ## Execution Mode
 
@@ -180,46 +180,21 @@ If a previous session was interrupted mid-checklist:
 
 This is the crash-recovery model: GitHub is the persistent state. What's checked is done; what's unchecked is pending.
 
-## Common Mistakes
+## Pitfalls
 
-**Problem:** Forgetting to sync after each item.
-**Fix:** Call `issue_push` after ticking each checkbox. If you batch updates, a crash between items loses progress — GitHub won't reflect what was actually completed.
+**Avoid:**
+- Batching checklist syncs — call `issue_push` after each item so a crash doesn't lose progress
+- Skipping spec compliance review before code quality review — reviewing code that doesn't match the spec is wasted effort
+- Claiming tests pass without running them — use `process:verify`; "should pass" is not evidence
+- Ticking items out of order — later tasks often assume earlier ones are complete; reorder only with explicit user approval
+- Skipping checklist items, even if they seem redundant or simple
+- Ignoring implementer escalations (BLOCKED/NEEDS_CONTEXT)
 
-**Problem:** Working on the main branch.
-**Fix:** Always use a worktree. The execute skill never works on main. If you find yourself in the main checkout, stop and set up the worktree before continuing.
-
-**Problem:** Switching branches in the main worktree.
-**Fix:** Never run `git checkout` or `git switch` in the main worktree. Multiple sessions share it — changing the branch breaks all other running sessions. Always operate inside a dedicated worktree.
-
-**Problem:** Skipping spec compliance review and going straight to code quality.
-**Fix:** Always do spec compliance first. Code quality review on an implementation that doesn't match the spec is wasted effort.
-
-**Problem:** Claiming tests pass without running them.
-**Fix:** Use `process:verify` — run the command, read the output, then claim the result. "Should pass" is not evidence.
-
-**Problem:** Ticking items out of order.
-**Fix:** Work through the checklist sequentially from top to bottom. Tasks may have implicit dependencies — later tasks often assume earlier ones are complete. Reordering without user approval risks building on a broken foundation.
-
-## Red Flags
-
-**Never:**
-- Work on the main/master branch
-- Run `git checkout` or `git switch` in the main worktree (multiple sessions share it)
-- Batch sync checklist updates at the end of the session
-- Skip checklist items (even if they seem redundant or simple)
-- Reorder tasks without explicit user approval
-- Skip spec compliance review before code quality review
-- Claim success without running verification (use `process:verify`)
-- Ignore implementer escalations (BLOCKED/NEEDS_CONTEXT)
-
-**Always:**
-- Use a worktree for all implementation work
-- Sync to GitHub via `issue_push` after every completed item
-- Work through the checklist sequentially
-- Commit changes after each item before syncing
-- Follow TDD when implementing (use `process:tdd`)
-- Run final quality review (tests, lint, subagent code review) before handing off to review
-- Resume from the first unchecked item when continuing interrupted work
+**Prefer:**
+- Committing changes after each item before syncing
+- Following TDD when implementing (use `process:tdd`)
+- Running final quality review (tests, lint, subagent code review) before handing off to review
+- Resuming from the first unchecked item when continuing interrupted work
 
 ## Integration
 
