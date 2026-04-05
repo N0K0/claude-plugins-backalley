@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# Stop hook: set terminal background to "ready" tint color.
-# Uses kitty IPC (Unix socket) — works during active TUI rendering.
+# Elicitation hook: set terminal background to "needs input" tint.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=_common.sh
@@ -9,7 +8,7 @@ source "${SCRIPT_DIR}/_common.sh"
 parse_input
 
 if read_state && [[ "$SUPPORTED" == "true" ]]; then
-    set_bg "$READY_COLOR"
+    set_bg "$ELICIT_COLOR"
 fi
 
 emit_ok
