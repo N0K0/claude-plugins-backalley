@@ -4,3 +4,5 @@ node_modules/
 .env
 .env.*
 *.tasks.json
+.issues/
+__pycache__/

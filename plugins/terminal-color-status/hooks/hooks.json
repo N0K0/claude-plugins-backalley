@@ -7,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/detect-osc.sh",
+            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/detect-kitty.sh",
             "timeout": 5
           }
         ]

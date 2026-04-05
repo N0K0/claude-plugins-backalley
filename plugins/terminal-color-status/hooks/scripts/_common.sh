@@ -45,10 +45,6 @@ STATEEOF
     mv "$tmp" "${STATE_FILE}"
 }
 
-# Set terminal background color via kitty remote control IPC.
-# Uses Unix socket — bypasses the terminal character stream entirely,
-# so it works even during Claude Code's active TUI rendering.
-# Targets only the current window via KITTY_WINDOW_ID.
 set_bg() {
     local color="$1"
     if [[ -n "${KITTY_WINDOW_ID:-}" ]]; then
