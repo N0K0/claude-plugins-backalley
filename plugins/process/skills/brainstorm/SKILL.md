@@ -53,9 +53,11 @@ Do not proceed past the entry gate unless all checks pass.
 
 8. Run the internal review loop before presenting the spec to the user (see below).
 
-9. Call `issue_update` to remove the `needs-spec` label and add `has-spec`.
+9. **Create follow-up issues for deferred decisions** (see Follow-Up Issues below).
 
-10. Tell the user: "Spec written to issue #N. Run `plan` to create the implementation checklist."
+10. Call `issue_update` to remove the `needs-spec` label and add `has-spec`.
+
+11. Tell the user: "Spec written to issue #N. Run `plan` to create the implementation checklist."
 
 ## Internal Review Loop
 
@@ -74,6 +76,46 @@ After writing the spec to the issue body (step 7) but before transitioning label
 **c. If the subagent returns issues:** Fix each issue in the spec, re-push the `.issues/` directory via `issue_push`, increment the iteration counter, and go back to step (a).
 
 **d. If the subagent returns PASS or iteration count reaches 5:** Proceed to step 9. If stopped at 5 iterations, tell the user: "Internal review found issues I couldn't fully resolve after 5 attempts. Presenting the spec as-is — please pay extra attention to the flagged areas."
+
+## Follow-Up Issues
+
+During the Q&A phase, the user often picks an approach but signals they may revisit the decision later. Watch for language like:
+
+- "Let's start with X and see if Y is needed"
+- "Go with X for now, we can switch to Y later"
+- "X first, then benchmark/evaluate Y"
+- "Start with X and go over to Y if needed"
+- Picking a partial option like "expose API now, integrate UI later" (option B when A = full scope, C = skip entirely)
+- Any answer that scopes work down while acknowledging the remainder is still valuable
+
+These are **deferred decisions** — the user chose a path but explicitly left the door open for an alternative.
+
+After the spec is written and reviewed (step 8), but before transitioning labels (step 10):
+
+1. Review the Q&A history for deferred decisions. Collect each one: what was chosen, what was deferred, and the trigger condition for revisiting (e.g., "if performance is too slow", "if the simpler approach isn't enough").
+
+2. If any deferred decisions were found, present them to the user:
+
+   ```
+   I noticed N deferred decisions during brainstorming. Want me to create
+   follow-up issues so they don't get lost?
+
+   1. "Evaluate dropping Lezer if WASM highlighting is fast enough"
+      Trigger: after initial implementation, benchmark WASM load time
+   2. "Switch to typed wasm-bindgen structs if JsValue becomes a bottleneck"
+      Trigger: if serialization overhead is noticeable on keystroke
+   ```
+
+3. Use the `AskUserQuestion` tool to let the user pick which follow-ups to create. Put "Create all" as the first (recommended) option.
+
+4. For each approved follow-up, create an issue file at `.issues/issue-new-{slug}.md` with:
+   - Title: the deferred decision as a clear action (e.g., "Evaluate dropping Lezer for WASM-only highlighting")
+   - Label: `needs-spec`
+   - Body: brief context — what was decided in the parent issue, what would trigger revisiting, and a link back (`Parent: #N`)
+
+5. Call `issue_push` with the `.issues/` directory to create the follow-up issues on GitHub.
+
+If no deferred decisions were found, skip this section silently.
 
 ## Handling GitHub Feedback
 
