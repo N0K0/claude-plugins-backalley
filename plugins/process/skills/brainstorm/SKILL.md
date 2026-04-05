@@ -27,7 +27,7 @@ Then determine which flow to follow:
 3. Create a new issue file at `.issues/issue-new.md` with a placeholder title, the `needs-spec` label, and an empty body. Do NOT push yet — the title and body will be filled in during the brainstorm process.
 4. Proceed directly to The Process below.
 
-At the end of Flow B (after the spec is written and reviewed), push the file via `issue_push` to create the issue on GitHub, then continue with the normal label transition.
+At the end of Flow B (after the spec is written and reviewed), push the file via `issue_push` to create the issue on GitHub. The push tool returns the new filename (e.g., `issue-42.md`) and issue number — use these to reference the issue for the rest of the flow (label transition, telling the user the issue number, etc.).
 
 Do not proceed past the entry gate unless all checks pass.
 
