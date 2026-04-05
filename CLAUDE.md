@@ -70,6 +70,17 @@ rm -rf ~/.claude/plugins/cache
 
 Then run `/reload-plugins`. No restart needed.
 
+## Versioning
+
+Bump version numbers in `.claude-plugin/plugin.json` when committing plugin changes. Follow semver based on conventional commit types:
+
+- `feat:` → minor bump (0.1.0 → 0.2.0)
+- `fix:` → patch bump (0.1.0 → 0.1.1)
+- `BREAKING CHANGE:` → major bump (0.1.0 → 1.0.0)
+- `chore:`, `docs:`, `refactor:` → patch bump
+
+If multiple plugins changed in one commit, bump each one.
+
 ## Development Workflow
 
 - Use git worktrees and feature branches for all feature work — never commit directly to main
