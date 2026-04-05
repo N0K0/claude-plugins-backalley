@@ -2,6 +2,8 @@
 
 A private Claude Code plugin marketplace. Plugins here extend Claude Code with custom workflows, integrations, and tooling.
 
+**Warning:** This is a vibecoded mess built for my own use. Expect rough edges. Sharing in case it's useful to others.
+
 ## Plugins
 
 | Name                                                    | Description                                                                                                                                       |
