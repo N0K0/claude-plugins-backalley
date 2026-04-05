@@ -23,17 +23,14 @@ Proceed only after all six checks pass.
 
 ## Execution Mode
 
-After parsing the checklist, present the execution mode choice:
+After parsing the checklist, use `AskUserQuestion` to present the execution mode choice. Put the recommended option first with "(Recommended)" in its label:
 
-```
-How should I execute this checklist?
+- For checklists with 3+ items, recommend subagent-driven
+- For 1-2 items, recommend direct execution
 
-1. Direct execution (I work through each item myself)
-2. Subagent-driven (fresh subagent per task, with two-stage review)
-
-Option 2 is recommended for checklists with 3+ items — it produces higher quality
-through isolated context and structured review between tasks.
-```
+Options:
+1. Direct execution — I work through each item myself
+2. Subagent-driven — fresh subagent per task, with two-stage review
 
 **If the user doesn't have a preference or says "just go":** default to direct execution for small checklists (1-2 items) and subagent-driven for larger ones.
 
