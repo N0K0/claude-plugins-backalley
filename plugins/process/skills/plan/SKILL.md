@@ -2,7 +2,6 @@
 name: plan
 description: "Use when breaking a specified issue into implementation tasks — reads the spec from the issue body, explores the codebase, and writes a checklist. Triggers on: 'plan issue N', 'break down issue N', 'checklist for issue N'."
 ---
-
 # Plan
 
 **Announce at start:** "I'm using the plan skill to break down issue #N into tasks."
@@ -41,7 +40,7 @@ Do not proceed past the entry gate unless all five checks pass.
 
 7. **Link to umbrella issue (if applicable):**
    - Check the issue body for a `Parent: #N` line. If found, N is the umbrella issue number.
-   - If no `Parent:` line exists, call `issue_search` with query `"#ISSUE_NUMBER" in:body is:open` to find issues whose body references this issue. Filter results to those containing a GitHub tasklist (`- [ ]` or `- [x]` items) that includes this issue number. If exactly one match is found, that is the umbrella.
+   - If no `Parent:` line exists, call `issue_search` with `body_contains: "#ISSUE_NUMBER"` and `state: open` to find issues whose body references this issue. Filter results to those containing a GitHub tasklist (`- [ ]` or `- [x]` items) that includes this issue number. If exactly one match is found, that is the umbrella.
    - If multiple candidates are found, ask the user: "I found multiple issues referencing #N: #A, #B. Which is the umbrella issue, or none?"
    - If an umbrella issue is identified: call `issue_pull` for the umbrella issue, check if `#ISSUE_NUMBER` already appears in the umbrella's tasklist, and if not, append `- [ ] #ISSUE_NUMBER` to the umbrella's tasklist and call `issue_push` for the umbrella.
 

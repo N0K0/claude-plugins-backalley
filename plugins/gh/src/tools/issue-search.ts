@@ -8,6 +8,7 @@ export interface SearchFilters {
   labels?: string;
   milestone?: string;
   assignee?: string;
+  body_contains?: string;
 }
 
 /**
@@ -33,11 +34,12 @@ export async function searchIssues(
   const labelFilter = filters.labels ? filters.labels.split(',').map(l => l.trim()) : null;
   const milestoneFilter = filters.milestone ?? null;
   const assigneeFilter = filters.assignee ?? null;
+  const bodyContains = filters.body_contains ?? null;
 
   for (const filePath of paths) {
     try {
       const content = await Bun.file(filePath).text();
-      const { frontmatter } = parseIssueFile(content);
+      const { frontmatter, body } = parseIssueFile(content);
 
       // State filter
       if (stateFilter !== 'all' && frontmatter.state !== stateFilter) continue;
@@ -66,6 +68,11 @@ export async function searchIssues(
         }
       }
 
+      // Body contains filter (case-insensitive substring match)
+      if (bodyContains !== null) {
+        if (!body.toLowerCase().includes(bodyContains.toLowerCase())) continue;
+      }
+
       results.push({
         number: frontmatter.number,
         title: frontmatter.title,
@@ -86,13 +93,14 @@ export async function searchIssues(
 export const tools: ToolDef[] = [
   {
     name: 'issue_search',
-    description: 'Search local .issues/ files by frontmatter fields (state, labels, milestone, assignee)',
+    description: 'Search local .issues/ files by frontmatter fields and body content',
     inputSchema: z.object({
       path: z.string().describe('Absolute path to the .issues/ directory'),
       state: z.enum(['open', 'closed', 'all']).optional().default('open').describe('Filter by state'),
       labels: z.string().optional().describe('Comma-separated label names (AND logic)'),
       milestone: z.string().optional().describe('Milestone number or "none"'),
       assignee: z.string().optional().describe('Username or "none"'),
+      body_contains: z.string().optional().describe('Case-insensitive substring to match in the issue body'),
     }),
     handler: async (args, _ctx: GhContext) => {
       return searchIssues(args.path, {
@@ -100,6 +108,7 @@ export const tools: ToolDef[] = [
         labels: args.labels,
         milestone: args.milestone,
         assignee: args.assignee,
+        body_contains: args.body_contains,
       });
     },
   },

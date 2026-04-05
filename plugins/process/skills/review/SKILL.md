@@ -55,7 +55,7 @@ Do not proceed past the entry gate unless all six checks pass.
    - Call `pr_merge` with squash strategy.
    - **Check off in umbrella issue:**
      - Check the issue body for a `Parent: #N` line. If found, N is the umbrella issue number.
-     - If no `Parent:` line, call `issue_search` with query `"#ISSUE_NUMBER" in:body is:open` to find issues whose body references this issue and contains a GitHub tasklist (`- [ ]` or `- [x]` items).
+     - If no `Parent:` line, call `issue_search` with `body_contains: "#ISSUE_NUMBER"` and `state: open` to find issues whose body references this issue and contains a GitHub tasklist (`- [ ]` or `- [x]` items).
      - If no match is found, skip this step.
      - If multiple candidates are found, ask the user: "I found multiple issues referencing #N: #A, #B. Which is the umbrella issue, or none?"
      - If an umbrella issue is identified: call `issue_pull` for the umbrella, change `- [ ] #ISSUE_NUMBER` to `- [x] #ISSUE_NUMBER` in the umbrella's body, call `issue_push` for the umbrella. Tell the user: "Checked off #ISSUE_NUMBER in umbrella issue #N."
