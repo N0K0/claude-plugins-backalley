@@ -14,11 +14,5 @@ if echo "$COMMAND" | grep -qE 'gh (issue|label|search issues|api.*/issues)'; the
     }
   }'
 elif echo "$COMMAND" | grep -qE 'gh pr (edit|create)'; then
-  jq -n '{
-    hookSpecificOutput: {
-      hookEventName: "PreToolUse",
-      permissionDecision: "deny",
-      permissionDecisionReason: "Use the gh plugin MCP tools (pr_create, pr_merge) instead of gh pr CLI commands. Edit PR metadata by editing the local issue file and pushing with issue_push."
-    }
-  }'
+  echo "NOTE: gh pr CLI commands are allowed for now, but MCP equivalents (pr_create, pr_merge) are planned. When available, prefer the MCP tools." >&2
 fi
