@@ -16,8 +16,8 @@ Then determine which flow to follow:
 
 ### Flow A: Existing issue (issue number provided)
 
-2. Call `issue_pull` to fetch the issue to a local file.
-3. Read the issue file and check its labels.
+2. Call `issue_pull` with the `.issues/` directory path to sync all issues locally.
+3. Read the issue file (`.issues/issue-{N}.md`) and check its labels.
 4. If the `needs-spec` label is NOT present, stop with: "Issue #{N} doesn't have the `needs-spec` label. [If has-spec: Run plan instead. If in-progress: Run execute instead.]"
 5. Announce: "I'm using the brainstorm skill to spec out issue #N."
 
@@ -27,7 +27,7 @@ Then determine which flow to follow:
 3. Create a new issue file at `.issues/issue-new.md` with a placeholder title, the `needs-spec` label, and an empty body. Do NOT push yet — the title and body will be filled in during the brainstorm process.
 4. Proceed directly to The Process below.
 
-At the end of Flow B (after the spec is written and reviewed), push the file via `issue_push` to create the issue on GitHub. The push tool returns the new filename (e.g., `issue-42.md`) and issue number — use these to reference the issue for the rest of the flow (label transition, telling the user the issue number, etc.).
+At the end of Flow B (after the spec is written and reviewed), push the `.issues/` directory via `issue_push` to sync all issues to GitHub. The push tool returns results per file — for the new issue, it returns the new filename (e.g., `issue-42.md`) and issue number. Use these to reference the issue for the rest of the flow (label transition, telling the user the issue number, etc.).
 
 Do not proceed past the entry gate unless all checks pass.
 
@@ -49,7 +49,7 @@ Do not proceed past the entry gate unless all checks pass.
 
 6. If the user mentions this issue is part of a larger initiative or umbrella issue, include a `Parent: #N` line at the top of the spec body when writing it.
 
-7. Once all sections are approved, assemble the full spec and write it into the issue body via `issue_push`.
+7. Once all sections are approved, assemble the full spec and write it into the issue body. Call `issue_push` with the `.issues/` directory to sync all issues.
 
 8. Run the internal review loop before presenting the spec to the user (see below).
 
@@ -61,7 +61,7 @@ Do not proceed past the entry gate unless all checks pass.
 
 After writing the spec to the issue body (step 7) but before transitioning labels (step 9), run this loop (max 5 iterations):
 
-**a. Checklist gate (fast):** Verify the spec contains all 5 required sections. If any is missing or empty, add it and re-push via `issue_push`.
+**a. Checklist gate (fast):** Verify the spec contains all 5 required sections. If any is missing or empty, add it and re-push the `.issues/` directory via `issue_push`.
 
 1. **Problem statement** — what problem are we solving and for whom?
 2. **Acceptance criteria** — concrete, testable conditions for "done"
@@ -71,7 +71,7 @@ After writing the spec to the issue body (step 7) but before transitioning label
 
 **b. Subagent review (deep):** Dispatch a review subagent with these instructions: "Review the following spec for completeness, internal consistency, and clarity. Flag: vague acceptance criteria, contradictions between sections, unstated assumptions, missing error handling, scope creep beyond the stated problem. Return a list of specific issues found, or 'PASS' if the spec is ready." Pass the full spec text to the subagent.
 
-**c. If the subagent returns issues:** Fix each issue in the spec, re-push via `issue_push`, increment the iteration counter, and go back to step (a).
+**c. If the subagent returns issues:** Fix each issue in the spec, re-push the `.issues/` directory via `issue_push`, increment the iteration counter, and go back to step (a).
 
 **d. If the subagent returns PASS or iteration count reaches 5:** Proceed to step 9. If stopped at 5 iterations, tell the user: "Internal review found issues I couldn't fully resolve after 5 attempts. Presenting the spec as-is — please pay extra attention to the flagged areas."
 
@@ -85,7 +85,7 @@ When the user says "check for feedback", "there's feedback on GitHub", or simila
 4. If new comments are found, for each comment:
    - Summarize what the commenter is asking for.
    - Apply the feedback to the spec in the local issue file.
-5. Call `issue_push` to sync the updated spec to GitHub.
+5. Call `issue_push` with the `.issues/` directory to sync all issues to GitHub.
 6. Re-run the internal review loop on the updated spec.
 7. Present a summary of changes made to the user.
 

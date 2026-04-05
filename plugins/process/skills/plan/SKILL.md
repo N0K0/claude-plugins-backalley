@@ -13,8 +13,8 @@ description: "Use when breaking a specified issue into implementation tasks — 
 Before doing any work, run these checks in order:
 
 1. Call `detect_repo` to set repo context. If the tool is not available, stop with: "The gh plugin is required. Install it from the backalley marketplace."
-2. Call `issue_pull` to fetch the issue to a local file.
-3. Read the issue file and check its labels.
+2. Call `issue_pull` with the `.issues/` directory path to sync all issues locally.
+3. Read the issue file (`.issues/issue-{N}.md`) and check its labels.
 4. If the `has-spec` label is NOT present, stop with: "Issue #{N} doesn't have the `has-spec` label. [If needs-spec: Run brainstorm first. If in-progress: Run execute instead.]"
 5. Check if the issue body already contains a `## Implementation Checklist` section. If it does, stop with: "Issue #{N} already has a checklist. Run execute to work through it."
 
@@ -36,13 +36,13 @@ Do not proceed past the entry gate unless all five checks pass.
 
 5. Show the checklist to the user for approval before pushing. Wait for explicit confirmation.
 
-6. Once approved, append the checklist to the issue body below the spec. Write it back via `issue_push`.
+6. Once approved, append the checklist to the issue body below the spec. Call `issue_push` with the `.issues/` directory to sync all issues.
 
 7. **Link to umbrella issue (if applicable):**
    - Check the issue body for a `Parent: #N` line. If found, N is the umbrella issue number.
    - If no `Parent:` line exists, call `issue_search` with `body_contains: "#ISSUE_NUMBER"` and `state: open` to find issues whose body references this issue. Filter results to those containing a GitHub tasklist (`- [ ]` or `- [x]` items) that includes this issue number. If exactly one match is found, that is the umbrella.
    - If multiple candidates are found, ask the user: "I found multiple issues referencing #N: #A, #B. Which is the umbrella issue, or none?"
-   - If an umbrella issue is identified: call `issue_pull` for the umbrella issue, check if `#ISSUE_NUMBER` already appears in the umbrella's tasklist, and if not, append `- [ ] #ISSUE_NUMBER` to the umbrella's tasklist and call `issue_push` for the umbrella.
+   - If an umbrella issue is identified: the umbrella file is already local from the full pull. Check if `#ISSUE_NUMBER` already appears in the umbrella's tasklist, and if not, append `- [ ] #ISSUE_NUMBER` to the umbrella's tasklist. The changes will be synced on the next `issue_push` of the `.issues/` directory.
 
 8. Create native Claude Code tasks via `TaskCreate` for session tracking — one task per checklist item.
 

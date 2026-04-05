@@ -13,8 +13,8 @@ description: "Use when an issue's checklist is fully complete — verifies tests
 Before doing any work, run these checks in order:
 
 1. Call `detect_repo` to set repo context. If the tool is not available, stop with: "The gh plugin is required. Install it from the backalley marketplace."
-2. Call `issue_pull` to fetch the issue to a local file.
-3. Read the issue file and check its labels.
+2. Call `issue_pull` with the `.issues/` directory path to sync all issues locally.
+3. Read the issue file (`.issues/issue-{N}.md`) and check its labels.
 4. If the `in-progress` label is NOT present, stop with: "Issue #{N} doesn't have the `in-progress` label. [If needs-spec: Run brainstorm first. If has-spec: Run plan first.]"
 5. Parse the checklist. If ANY items are unchecked (`- [ ]`), stop with: "Issue #{N} has unchecked items. Run execute to complete them first."
 6. Run the project's test commands. Look for test scripts in `package.json` (`scripts.test`), a `Makefile` (`make test`), or other common test runners. If tests fail, stop with: "Tests are failing. Run execute to fix them before creating a PR."
@@ -58,7 +58,7 @@ Do not proceed past the entry gate unless all six checks pass.
      - If no `Parent:` line, call `issue_search` with `body_contains: "#ISSUE_NUMBER"` and `state: open` to find issues whose body references this issue and contains a GitHub tasklist (`- [ ]` or `- [x]` items).
      - If no match is found, skip this step.
      - If multiple candidates are found, ask the user: "I found multiple issues referencing #N: #A, #B. Which is the umbrella issue, or none?"
-     - If an umbrella issue is identified: call `issue_pull` for the umbrella, change `- [ ] #ISSUE_NUMBER` to `- [x] #ISSUE_NUMBER` in the umbrella's body, call `issue_push` for the umbrella. Tell the user: "Checked off #ISSUE_NUMBER in umbrella issue #N."
+     - If an umbrella issue is identified: the umbrella file is already local from the full pull. Change `- [ ] #ISSUE_NUMBER` to `- [x] #ISSUE_NUMBER` in the umbrella's body. Call `issue_push` with the `.issues/` directory to sync all issues. Tell the user: "Checked off #ISSUE_NUMBER in umbrella issue #N."
    - Clean up the worktree: `git worktree remove ../worktree-issue-{number}`
    - Delete the local branch from within the worktree or after removal — **never run `git checkout` in the main worktree** to do this. Use `git branch -D issue-{number}` from the main worktree (this deletes without switching branches) or from another worktree.
    - Confirm: "PR merged, issue #{N} closed, worktree cleaned up."

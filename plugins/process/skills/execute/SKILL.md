@@ -13,8 +13,8 @@ description: "Implements an issue's checklist by creating a worktree, working th
 Before doing any work, run these checks in order:
 
 1. Call `detect_repo` to set repo context. If the tool is not available, stop with: "The gh plugin is required. Install it from the backalley marketplace."
-2. Call `issue_pull` to fetch the issue to a local file.
-3. Read the issue file and check its labels.
+2. Call `issue_pull` with the `.issues/` directory path to sync all issues locally.
+3. Read the issue file (`.issues/issue-{N}.md`) and check its labels.
 4. If the `in-progress` label is NOT present, stop with: "Issue #{N} doesn't have the `in-progress` label. [If needs-spec: Run brainstorm first. If has-spec: Run plan first.]"
 5. Parse the issue body for checklist items (`- [ ]` and `- [x]`). If there are no checklist items, stop with: "Issue #{N} has no checklist. Run plan to create one."
 6. If ALL items are already checked (`- [x]`), stop with: "All checklist items are complete. Run review to create a PR."
@@ -65,7 +65,7 @@ For each unchecked item in order:
 3. Commit the changes with a descriptive message referencing the checklist item.
 4. Mark the native task as `completed`.
 5. In the local issue file, change `- [ ]` to `- [x]` for this item.
-6. Call `issue_push` to sync the updated checklist to GitHub.
+6. Call `issue_push` with the `.issues/` directory to sync all issues to GitHub.
 
 ## Subagent-Driven Execution
 
@@ -115,7 +115,7 @@ Dispatch a spec compliance reviewer using `spec-reviewer-prompt.md`. This verifi
 
 1. Mark the native task as `completed`.
 2. In the local issue file, change `- [ ]` to `- [x]` for this item.
-3. Call `issue_push` to sync to GitHub.
+3. Call `issue_push` with the `.issues/` directory to sync all issues to GitHub.
 
 Then proceed to the next unchecked item.
 
@@ -131,7 +131,7 @@ After all checklist items are checked, before telling the user to run review:
 
 4. If the subagent returns findings: fix each issue, commit the fixes, and re-run (max 3 iterations).
 
-5. After the review passes, sync the final checklist state via `issue_push`.
+5. After the review passes, call `issue_push` with the `.issues/` directory to sync all issues.
 
 ## Worktree Conventions
 
@@ -160,7 +160,7 @@ For checklists with independent tasks that touch non-overlapping files, you can 
    - `git merge issue-{number}-task-{N}`
    - `git worktree remove ../worktree-issue-{number}-task-{N}`
    - `git branch -d issue-{number}-task-{N}`
-4. Tick the checkbox and sync via `issue_push` as normal.
+4. Tick the checkbox and sync by calling `issue_push` with the `.issues/` directory.
 
 **Conflict handling:** If merge conflicts occur, resolve them in the main worktree, commit, and continue. If conflicts are complex, fall back to sequential execution for remaining tasks.
 
@@ -183,7 +183,7 @@ This is the crash-recovery model: GitHub is the persistent state. What's checked
 ## Pitfalls
 
 **Avoid:**
-- Batching checklist syncs — call `issue_push` after each item so a crash doesn't lose progress
+- Batching checklist syncs — call `issue_push` with the `.issues/` directory after each item so a crash doesn't lose progress
 - Skipping spec compliance review before code quality review — reviewing code that doesn't match the spec is wasted effort
 - Claiming tests pass without running them — use `process:verify`; "should pass" is not evidence
 - Ticking items out of order — later tasks often assume earlier ones are complete; reorder only with explicit user approval
