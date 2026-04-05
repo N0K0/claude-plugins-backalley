@@ -1,5 +1,5 @@
 #!/bin/bash
-# PreToolUse hook: warn when Bash uses gh CLI for issue operations
+# PreToolUse hook: warn when Bash uses gh CLI for issue/PR operations
 # instead of the local .issues/ files and MCP tools.
 
 INPUT=$(cat)
@@ -11,6 +11,14 @@ if echo "$COMMAND" | grep -qE 'gh (issue|label|search issues|api.*/issues)'; the
       hookEventName: "PreToolUse",
       permissionDecision: "deny",
       permissionDecisionReason: "Use local .issues/ files and gh plugin MCP tools (issue_pull, issue_push, issue_search) instead of gh CLI commands. Issues are synced locally — pull with issue_pull, search with issue_search, read with the Read tool."
+    }
+  }'
+elif echo "$COMMAND" | grep -qE 'gh pr (edit|create)'; then
+  jq -n '{
+    hookSpecificOutput: {
+      hookEventName: "PreToolUse",
+      permissionDecision: "deny",
+      permissionDecisionReason: "Use the gh plugin MCP tools (pr_create, pr_merge) instead of gh pr CLI commands. Edit PR metadata by editing the local issue file and pushing with issue_push."
     }
   }'
 fi
