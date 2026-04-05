@@ -27,8 +27,6 @@ Then determine which flow to follow:
 3. Create a new issue file at `.issues/issue-new.md` with a placeholder title, the `needs-spec` label, and an empty body. Do NOT push yet — the title and body will be filled in during the brainstorm process.
 4. Proceed directly to The Process below.
 
-At the end of Flow B (after the spec is written and reviewed), push the `.issues/` directory via `issue_push` to sync all issues to GitHub. The push tool returns results per file — for the new issue, it returns the new filename (e.g., `issue-42.md`) and issue number. Use these to reference the issue for the rest of the flow (label transition, telling the user the issue number, etc.).
-
 Do not proceed past the entry gate unless all checks pass.
 
 ## The Process
@@ -49,21 +47,23 @@ Do not proceed past the entry gate unless all checks pass.
 
 6. If the user mentions this issue is part of a larger initiative or umbrella issue, include a `Parent: #N` line at the top of the spec body when writing it.
 
-7. Once all sections are approved, assemble the full spec and write it into the issue body. Call `issue_push` with the `.issues/` directory to sync all issues.
+7. Once all sections are approved, assemble the full spec and write it into the local issue file. Do NOT push yet.
 
 8. Run the internal review loop before presenting the spec to the user (see below).
 
 9. **Create follow-up issues for deferred decisions** (see Follow-Up Issues below).
 
-10. Call `issue_update` to remove the `needs-spec` label and add `has-spec`.
+10. **Push once:** Call `issue_push` with the `.issues/` directory to sync the spec (and any follow-up issues) to GitHub. This is the only push in the entire flow.
 
-11. Tell the user: "Spec written to issue #N. Run `plan` to create the implementation checklist."
+11. Call `issue_update` to remove the `needs-spec` label and add `has-spec`.
+
+12. Tell the user: "Spec written to issue #N. Run `plan` to create the implementation checklist."
 
 ## Internal Review Loop
 
 After writing the spec to the issue body (step 7) but before transitioning labels (step 9), run this loop (max 5 iterations):
 
-**a. Checklist gate (fast):** Verify the spec contains all 5 required sections. If any is missing or empty, add it and re-push the `.issues/` directory via `issue_push`.
+**a. Checklist gate (fast):** Verify the spec contains all 5 required sections. If any is missing or empty, add it to the local file.
 
 1. **Problem statement** — what problem are we solving and for whom?
 2. **Acceptance criteria** — concrete, testable conditions for "done"
@@ -73,9 +73,9 @@ After writing the spec to the issue body (step 7) but before transitioning label
 
 **b. Subagent review (deep):** Dispatch a review subagent with these instructions: "Review the following spec for completeness, internal consistency, and clarity. Flag: vague acceptance criteria, contradictions between sections, unstated assumptions, missing error handling, scope creep beyond the stated problem. Return a list of specific issues found, or 'PASS' if the spec is ready." Pass the full spec text to the subagent.
 
-**c. If the subagent returns issues:** Fix each issue in the spec, re-push the `.issues/` directory via `issue_push`, increment the iteration counter, and go back to step (a).
+**c. If the subagent returns issues:** Fix each issue in the local spec file, increment the iteration counter, and go back to step (a).
 
-**d. If the subagent returns PASS or iteration count reaches 5:** Proceed to step 9. If stopped at 5 iterations, tell the user: "Internal review found issues I couldn't fully resolve after 5 attempts. Presenting the spec as-is — please pay extra attention to the flagged areas."
+**d. If the subagent returns PASS or iteration count reaches 5:** Proceed to step 9 (follow-up issues). If stopped at 5 iterations, tell the user: "Internal review found issues I couldn't fully resolve after 5 attempts. Presenting the spec as-is — please pay extra attention to the flagged areas."
 
 ## Follow-Up Issues
 
@@ -90,7 +90,7 @@ During the Q&A phase, the user often picks an approach but signals they may revi
 
 These are **deferred decisions** — the user chose a path but explicitly left the door open for an alternative.
 
-After the spec is written and reviewed (step 8), but before transitioning labels (step 10):
+After the spec is written and reviewed (step 8), but before pushing (step 10):
 
 1. Review the Q&A history for deferred decisions. Collect each one: what was chosen, what was deferred, and the trigger condition for revisiting (e.g., "if performance is too slow", "if the simpler approach isn't enough").
 
@@ -113,7 +113,7 @@ After the spec is written and reviewed (step 8), but before transitioning labels
    - Label: `needs-spec`
    - Body: brief context — what was decided in the parent issue, what would trigger revisiting, and a link back (`Parent: #N`)
 
-5. Call `issue_push` with the `.issues/` directory to create the follow-up issues on GitHub.
+5. The follow-up issue files will be pushed together with the spec in step 10.
 
 If no deferred decisions were found, skip this section silently.
 
@@ -127,8 +127,8 @@ When the user says "check for feedback", "there's feedback on GitHub", or simila
 4. If new comments are found, for each comment:
    - Summarize what the commenter is asking for.
    - Apply the feedback to the spec in the local issue file.
-5. Call `issue_push` with the `.issues/` directory to sync all issues to GitHub.
-6. Re-run the internal review loop on the updated spec.
+5. Re-run the internal review loop on the updated spec (all local).
+6. Call `issue_push` with the `.issues/` directory to sync all issues to GitHub.
 7. Present a summary of changes made to the user.
 
 ## Key Principles
