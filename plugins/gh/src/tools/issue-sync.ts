@@ -64,7 +64,7 @@ export const tools: ToolDef[] = [
   },
   {
     name: 'issue_push',
-    description: 'Push local markdown issue files back to GitHub, syncing metadata, body, and comments',
+    description: 'Push local markdown issue files back to GitHub, syncing metadata, body, and comments. Returns results with action, number, title, html_url, file (basename), and path (absolute). For new issues, the file is renamed from issue-new*.md to issue-{number}.md and the new path is returned.',
     inputSchema: z.object({
       ...repoParams,
       path: z.string().describe('Path to a markdown file or directory of issue files'),
@@ -116,6 +116,7 @@ export const tools: ToolDef[] = [
               title: created.title,
               html_url: created.html_url,
               file: newPath.split('/').pop(),
+              path: newPath,
             });
           } else {
             // Update existing issue metadata + body
@@ -170,6 +171,8 @@ export const tools: ToolDef[] = [
               number: result.number,
               title: result.title,
               html_url: result.html_url,
+              file: filePath.split('/').pop(),
+              path: filePath,
             };
             if (skipped.length > 0) pushResult.skipped = skipped;
             results.push(pushResult);
