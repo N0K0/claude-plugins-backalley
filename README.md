@@ -4,12 +4,12 @@ A private Claude Code plugin marketplace. Plugins here extend Claude Code with c
 
 ## Plugins
 
-| Name                                                    | Description                                                                                                                 |
-| ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
-| [gh](plugins/gh/)                                       | MCP server for GitHub CLI — issue pull/push/diff with comment sync and local search                                         |
-| [markdown-format](plugins/markdown-format/)             | Auto-fix common markdown formatting issues in .md files                                                                     |
-| [process](plugins/process/)                             | GitHub Issues-driven development workflow — brainstorm, plan, execute, review, with TDD, debugging, and verification skills |
-| [terminal-color-status](plugins/terminal-color-status/) | Changes terminal background color to indicate when Claude Code is ready for input                                           |
+| Name                                                    | Description                                                                                                                                       |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [gh](plugins/gh/)                                       | MCP server for GitHub CLI — issue pull/push/diff with comment sync and local search                                                               |
+| [markdown-format](plugins/markdown-format/)             | Auto-fix common markdown formatting issues in .md files                                                                                           |
+| [process](plugins/process/)                             | GitHub Issues-driven dev workflow inspired by [superpowers](https://github.com/obra/superpowers), built on Claude native features + GitHub Issues |
+| [terminal-color-status](plugins/terminal-color-status/) | Changes terminal background color to show Claude's state — currently Kitty-only, OSC support planned                                              |
 
 ## Installation
 

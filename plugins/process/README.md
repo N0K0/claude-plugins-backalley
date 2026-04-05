@@ -1,6 +1,6 @@
 # process Plugin
 
-GitHub Issues-driven development workflow with four skills: brainstorm, plan, execute, review.
+GitHub Issues-driven development workflow with four skills: brainstorm, plan, execute, review. Heavily inspired by [superpowers](https://github.com/obra/superpowers), reimplemented with Claude Code native features (skills, agents, hooks, tasks) and a GitHub Issues layer for state management.
 
 ## Prerequisites
 
@@ -9,7 +9,6 @@ GitHub Issues-driven development workflow with four skills: brainstorm, plan, ex
 - **git** with worktree support
 
 ## Label State Machine
-
 ```
 backlog + needs-spec  →  brainstorm  →  backlog + has-spec
 backlog + has-spec    →  plan        →  in-progress
@@ -21,12 +20,12 @@ Labels managed by the plugin: `needs-spec`, `has-spec`, `in-progress`, `backlog`
 
 ## Skills
 
-| Skill | Triggers | Entry State | Exit State |
-|-------|----------|-------------|------------|
-| brainstorm | "brainstorm issue N", "spec out issue N" | `needs-spec` | `has-spec` |
-| plan | "plan issue N", "break down issue N" | `has-spec` | `in-progress` |
-| execute | "work on issue N", "implement issue N" | `in-progress` + unchecked items | checklist items ticked |
-| review | "review issue N", "PR for issue N" | `in-progress` + all items checked | closed (via PR) |
+| Skill      | Triggers                                 | Entry State                       | Exit State             |
+| ---------- | ---------------------------------------- | --------------------------------- | ---------------------- |
+| brainstorm | "brainstorm issue N", "spec out issue N" | `needs-spec`                      | `has-spec`             |
+| plan       | "plan issue N", "break down issue N"     | `has-spec`                        | `in-progress`          |
+| execute    | "work on issue N", "implement issue N"   | `in-progress` + unchecked items   | checklist items ticked |
+| review     | "review issue N", "PR for issue N"       | `in-progress` + all items checked | closed (via PR)        |
 
 ### brainstorm
 
@@ -45,7 +44,6 @@ Creates a git worktree (`../worktree-issue-{number}` on branch `issue-{number}`)
 Verifies tests pass, creates a PR with `Closes #{number}`, and offers merge or keep-open. Cleans up the worktree after merge.
 
 ## Usage
-
 ```
 # Start with an issue that has the needs-spec label
 "brainstorm issue 42"

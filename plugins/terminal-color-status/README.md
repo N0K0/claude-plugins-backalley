@@ -1,6 +1,6 @@
 # terminal-color-status
 
-A Claude Code plugin that changes your terminal background color to show what Claude is doing at a glance.
+A Claude Code plugin that changes your terminal background color to show what Claude is doing at a glance. Currently Kitty-only, with planned support for all OSC-compatible terminals.
 
 ## How it works
 
