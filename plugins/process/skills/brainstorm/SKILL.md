@@ -1,11 +1,8 @@
 ---
 name: brainstorm
-description: "Use when specifying a GitHub issue — brainstorm requirements, propose approaches, and write a spec into the issue body. Triggers on: 'brainstorm issue N', 'spec out issue N', 'specify issue N'."
+description: "Brainstorm requirements, propose approaches, and write a spec into a GitHub issue. Triggers on: 'brainstorm issue N', 'spec out issue N', 'specify issue N', 'brainstorm <topic>'."
 ---
-
 # Brainstorm
-
-**Announce at start:** "I'm using the brainstorm skill to spec out issue #N."
 
 **Core principle:** The GitHub Issue body is the spec. No local files.
 
@@ -14,17 +11,31 @@ description: "Use when specifying a GitHub issue — brainstorm requirements, pr
 Before doing any work, run these checks in order:
 
 1. Call `detect_repo` to set repo context. If the tool is not available, stop with: "The gh plugin is required. Install it from the backalley marketplace."
+
+Then determine which flow to follow:
+
+### Flow A: Existing issue (issue number provided)
+
 2. Call `issue_pull` to fetch the issue to a local file.
 3. Read the issue file and check its labels.
 4. If the `needs-spec` label is NOT present, stop with: "Issue #{N} doesn't have the `needs-spec` label. [If has-spec: Run plan instead. If in-progress: Run execute instead.]"
+5. Announce: "I'm using the brainstorm skill to spec out issue #N."
 
-Do not proceed past the entry gate unless all four checks pass.
+### Flow B: New issue (no issue number, or user describes a new idea)
+
+2. Announce: "I'm using the brainstorm skill to spec out a new issue."
+3. Create a new issue file at `.issues/issue-new.md` with a placeholder title, the `needs-spec` label, and an empty body. Do NOT push yet — the title and body will be filled in during the brainstorm process.
+4. Proceed directly to The Process below.
+
+At the end of Flow B (after the spec is written and reviewed), push the file via `issue_push` to create the issue on GitHub, then continue with the normal label transition.
+
+Do not proceed past the entry gate unless all checks pass.
 
 ## The Process
 
 1. Read the issue body for any existing context, requirements, or discussion. Use this as input — don't re-ask things already answered.
 
-2. Ask clarifying questions one at a time. Prefer multiple choice when possible. Wait for an answer before asking the next question. Focus on:
+2. Ask clarifying questions one at a time using the `AskUserQuestion` tool. Prefer multiple choice when possible. Put the recommended answer first and mark it with "(Recommended)" in its label. Wait for an answer before asking the next question. Focus on:
    - Purpose: what problem does this solve?
    - Constraints: what must it work with or within?
    - Success criteria: how do we know it's done?
