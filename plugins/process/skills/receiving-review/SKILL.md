@@ -160,7 +160,7 @@ Do not write long apologies, defend why you pushed back, or over-explain. State 
 
 ## GitHub Thread Replies
 
-When replying to inline review comments on GitHub, reply in the PR comment thread using `gh api` with the appropriate endpoint, or use the gh plugin's tools if available. Do not post as a top-level PR comment.
+When replying to inline review comments on GitHub, reply in the PR comment thread using the gh plugin's MCP tools. Do not use `gh api` or `gh pr` CLI commands directly. Do not post as a top-level PR comment.
 
 ## The Bottom Line
 

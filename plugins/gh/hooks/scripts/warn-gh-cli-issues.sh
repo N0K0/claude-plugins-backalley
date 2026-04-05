@@ -5,7 +5,7 @@
 INPUT=$(cat)
 COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // ""')
 
-if echo "$COMMAND" | grep -qE 'gh (issue|api.*/issues)'; then
+if echo "$COMMAND" | grep -qE 'gh (issue|label|search issues|api.*/issues)'; then
   jq -n '{
     hookSpecificOutput: {
       hookEventName: "PreToolUse",
