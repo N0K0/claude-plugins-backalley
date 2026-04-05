@@ -2,7 +2,6 @@
 name: execute
 description: "Use when implementing an issue that has a checklist — creates a worktree, works through tasks, ticks checkboxes, and syncs to GitHub. Triggers on: 'work on issue N', 'implement issue N', 'execute issue N'."
 ---
-
 # Execute
 
 **Announce at start:** "I'm using the execute skill to implement issue #N."
@@ -22,6 +21,22 @@ Before doing any work, run these checks in order:
 
 Do not proceed past the entry gate unless all six checks pass.
 
+## Execution Mode
+
+After parsing the checklist, present the execution mode choice:
+
+```
+How should I execute this checklist?
+
+1. Direct execution (I work through each item myself)
+2. Subagent-driven (fresh subagent per task, with two-stage review)
+
+Option 2 is recommended for checklists with 3+ items — it produces higher quality
+through isolated context and structured review between tasks.
+```
+
+**If the user doesn't have a preference or says "just go":** default to direct execution for small checklists (1-2 items) and subagent-driven for larger ones.
+
 ## The Process
 
 1. Parse the checklist: identify unchecked (`- [ ]`) items as remaining work. Note which items are already checked (`- [x]`) — those are done.
@@ -35,27 +50,88 @@ Do not proceed past the entry gate unless all six checks pass.
      - If the branch exists: `git worktree add ../worktree-issue-{number} issue-{number}`
      - If it doesn't exist: `git worktree add ../worktree-issue-{number} -b issue-{number}`
 
-4. For each unchecked item in order:
-   - Mark the corresponding native task as `in_progress`.
-   - Do the implementation work in the worktree.
-   - Commit the changes with a descriptive message referencing the checklist item.
-   - Mark the native task as `completed`.
-   - In the local issue file, change `- [ ]` to `- [x]` for this item.
-   - Call `issue_push` to sync the updated checklist to GitHub.
+4. For each unchecked item, execute using the chosen mode (see Direct Execution or Subagent-Driven Execution below).
 
-5. **Final quality review** — after all checklist items are checked but before telling the user to run review:
-
-   a. Run the project's full test suite. Look for test scripts in `package.json` (`scripts.test`), a `Makefile` (`make test`), or other common test runners. If tests fail, fix them and commit the fixes.
-
-   b. Run the project's linter if one exists (check `package.json` for a `lint` script, `Makefile` for a `lint` target, or common config files like `.eslintrc`, `ruff.toml`, `biome.json`). Fix any issues and commit.
-
-   c. Dispatch a code-review subagent with these instructions: "Review the diff between the `issue-{number}` branch and `main`. Check for: code reuse opportunities (duplicated logic that could be extracted), style and practices issues (naming, error handling, logging), missing or inadequate tests, potential performance issues. Return a list of specific findings with file paths and line numbers, or 'PASS' if the code is clean."
-
-   d. If the subagent returns findings: fix each issue, commit the fixes, and re-run the subagent (max 3 iterations).
-
-   e. After the review passes (or after 3 iterations), sync the final checklist state via `issue_push`.
+5. After all items are checked, run the **Final Quality Review** (see below).
 
 6. When all items are checked and the quality review passes, tell the user: "All tasks complete for issue #N. Run `review` to create a PR."
+
+## Direct Execution
+
+For each unchecked item in order:
+
+1. Mark the corresponding native task as `in_progress`.
+2. Follow `process:tdd` — write failing test first, then implement.
+3. Commit the changes with a descriptive message referencing the checklist item.
+4. Mark the native task as `completed`.
+5. In the local issue file, change `- [ ]` to `- [x]` for this item.
+6. Call `issue_push` to sync the updated checklist to GitHub.
+
+## Subagent-Driven Execution
+
+Fresh subagent per task + two-stage review (spec compliance then code quality). This prevents context pollution between tasks and catches issues early.
+
+For each unchecked item in order:
+
+### Step 1: Dispatch Implementer
+
+Mark the native task as `in_progress`, then dispatch a subagent using the template in `implementer-prompt.md`. Provide:
+- Full text of the checklist item
+- Context about the issue and what's already implemented
+- The worktree directory to work in
+
+### Step 2: Handle Implementer Status
+
+The implementer reports one of four statuses:
+
+**DONE:** Proceed to spec compliance review.
+
+**DONE_WITH_CONCERNS:** Read the concerns. If about correctness or scope, address before review. If observational (e.g., "file is getting large"), note and proceed to review.
+
+**NEEDS_CONTEXT:** Provide the missing information and re-dispatch.
+
+**BLOCKED:** Assess the blocker:
+1. If context problem: provide more context and re-dispatch
+2. If task is too complex: break into smaller pieces
+3. If the plan itself is wrong: escalate to the user
+
+Never force the same subagent to retry without changes.
+
+### Step 3: Spec Compliance Review
+
+Dispatch a spec compliance reviewer using `spec-reviewer-prompt.md`. This verifies the implementer built what was requested — nothing more, nothing less.
+
+- If issues found: have the implementer fix them, then re-review (max 3 iterations)
+- If compliant: proceed to code quality review
+
+### Step 4: Code Quality Review
+
+**Only after spec compliance passes.** Dispatch a code quality reviewer using `code-quality-reviewer-prompt.md`.
+
+- If issues found: have the implementer fix them, then re-review (max 3 iterations)
+- If approved: mark task complete
+
+### Step 5: Complete Item
+
+1. Mark the native task as `completed`.
+2. In the local issue file, change `- [ ]` to `- [x]` for this item.
+3. Call `issue_push` to sync to GitHub.
+
+Then proceed to the next unchecked item.
+
+## Final Quality Review
+
+After all checklist items are checked, before telling the user to run review:
+
+1. **Run tests.** Look for test scripts in `package.json` (`scripts.test`), a `Makefile` (`make test`), or other common test runners. If tests fail, fix them and commit. Use `process:verify` — run the command, read the output, then claim the result.
+
+2. **Run linter** if one exists (check `package.json` for a `lint` script, `Makefile` for a `lint` target, or common config files like `.eslintrc`, `ruff.toml`, `biome.json`). Fix any issues and commit.
+
+3. **Dispatch a final code-review subagent** (using the `process:code-reviewer` agent) to review the full diff between the `issue-{number}` branch and `main`. This catches cross-task issues that per-task reviews miss: duplicated logic across tasks, inconsistent patterns, missing integration tests.
+
+4. If the subagent returns findings: fix each issue, commit the fixes, and re-run (max 3 iterations).
+
+5. After the review passes, sync the final checklist state via `issue_push`.
 
 ## Worktree Conventions
 
@@ -115,14 +191,14 @@ This is the crash-recovery model: GitHub is the persistent state. What's checked
 **Problem:** Switching branches in the main worktree.
 **Fix:** Never run `git checkout` or `git switch` in the main worktree. Multiple sessions share it — changing the branch breaks all other running sessions. Always operate inside a dedicated worktree.
 
-**Problem:** Not creating a worktree.
-**Fix:** Check `git worktree list` before starting implementation. If the worktree doesn't exist, create it. If it already exists from a prior session, reuse it.
+**Problem:** Skipping spec compliance review and going straight to code quality.
+**Fix:** Always do spec compliance first. Code quality review on an implementation that doesn't match the spec is wasted effort.
+
+**Problem:** Claiming tests pass without running them.
+**Fix:** Use `process:verify` — run the command, read the output, then claim the result. "Should pass" is not evidence.
 
 **Problem:** Ticking items out of order.
 **Fix:** Work through the checklist sequentially from top to bottom. Tasks may have implicit dependencies — later tasks often assume earlier ones are complete. Reordering without user approval risks building on a broken foundation.
-
-**Problem:** Telling the user to run review without running a quality check.
-**Fix:** Always run tests, lint, and subagent code review after completing all checklist items. Catching issues here is cheaper than catching them in PR review.
 
 ## Red Flags
 
@@ -132,18 +208,35 @@ This is the crash-recovery model: GitHub is the persistent state. What's checked
 - Batch sync checklist updates at the end of the session
 - Skip checklist items (even if they seem redundant or simple)
 - Reorder tasks without explicit user approval
+- Skip spec compliance review before code quality review
+- Claim success without running verification (use `process:verify`)
+- Ignore implementer escalations (BLOCKED/NEEDS_CONTEXT)
 
 **Always:**
 - Use a worktree for all implementation work
 - Sync to GitHub via `issue_push` after every completed item
 - Work through the checklist sequentially
 - Commit changes after each item before syncing
+- Follow TDD when implementing (use `process:tdd`)
 - Run final quality review (tests, lint, subagent code review) before handing off to review
 - Resume from the first unchecked item when continuing interrupted work
 
 ## Integration
 
 **Requires:** gh plugin (`detect_repo`, `issue_pull`, `issue_push`), git worktrees
+
+**Uses skills:**
+- `process:tdd` — Red-Green-Refactor cycle during implementation
+- `process:verify` — Evidence before completion claims
+- `process:debugging` — When tests fail or unexpected behavior occurs
+
+**Uses agents:**
+- `process:code-reviewer` — Final quality review and per-task code quality review
+
+**Uses prompt templates (in this directory):**
+- `implementer-prompt.md` — Subagent dispatch for implementation
+- `spec-reviewer-prompt.md` — Subagent dispatch for spec compliance
+- `code-quality-reviewer-prompt.md` — Subagent dispatch for code quality
 
 **Previous skill:** `plan` (created the checklist in the issue body)
 

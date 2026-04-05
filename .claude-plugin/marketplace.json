@@ -25,7 +25,7 @@
     },
     {
       "name": "process",
-      "description": "GitHub Issues-driven development workflow — brainstorm, plan, execute, review",
+      "description": "GitHub Issues-driven development workflow — brainstorm, plan, execute, review, with TDD, debugging, and verification skills",
       "author": {
         "name": "nikolas"
       },
