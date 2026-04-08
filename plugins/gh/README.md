@@ -1,113 +1,51 @@
-# gh MCP Plugin
+# gh
 
-MCP server wrapping the `gh` CLI for use with Claude Code. Exposes 24 tools across Issues, Labels, Milestones, Projects (V2), and Pull Requests.
+MCP server for the GitHub CLI with a local-file workflow for issues. Pull issues to `.issues/` as markdown, edit them with frontmatter, and push back to GitHub — comments and all. Also exposes labels, milestones, projects, and pull requests as MCP tools.
 
-## Prerequisites
+## Install
+```
+/plugin marketplace add N0K0/claude-plugins-backalley
+/plugin install gh@claude-plugins-backalley
+```
+
+## Components
+
+### Skills
+
+- **create-issue** — write a new issue as a local markdown file with frontmatter; auto-synced to GitHub on Stop hook or manual push.
+  Example: ask "create an issue titled 'Fix login redirect' with the bug label" — Claude writes `.issues/issue-new-login.md` and the Stop hook pushes it.
+
+### Hooks
+
+- **SessionStart** — runs `session-start-pull.sh` to refresh any issue files already present in `.issues/`, so local files start the session up to date.
+- **Stop** — runs `stop-push.sh` to push modified issue files (and create new ones from `issue-new*.md`) when the session ends.
+- **PreToolUse:Bash** — runs `warn-gh-cli-issues.sh` to discourage using `gh issue …` shell commands when MCP tools should be used instead.
+
+### MCP servers
+
+The plugin ships one MCP server (`gh`) wrapping the `gh` CLI. Tools are grouped by purpose; one example per group below.
+
+- **Repo detection** — `detect_repo` sets the default owner/repo from a local git path so other tools don't need explicit repo args.
+  Example tool call: `detect_repo({ path: "/home/me/git/myproject" })`.
+- **Issue local-file sync** — `issue_pull`, `issue_push`, `issue_diff` move issues between GitHub and `.issues/*.md` files with comment sync and conflict detection.
+  Example: `issue_pull({ path: ".issues", state: "open" })` writes every open issue as a markdown file.
+- **Issue CRUD & search** — `issue_create`, `issue_update`, `issue_get`, `issue_list`, `issue_search`, `issue_comment` for direct API access without the local file dance.
+  Example: `issue_search({ body_contains: "OOM", labels: "bug" })`.
+- **Labels** — `label_create`, `label_list`, `label_delete`.
+  Example: `label_create({ name: "needs-spec", color: "fbca04" })`.
+- **Milestones** — `milestone_create`, `milestone_list`, `milestone_update`.
+  Example: `milestone_list({ state: "open" })`.
+- **Projects (V2)** — `project_list`, `project_items`, `project_move`, `project_add`.
+  Example: `project_add({ project_id: 3, content_id: "I_kw..." })`.
+- **Pull requests** — `pr_create`, `pr_list`, `pr_get`, `pr_merge`, `pr_review_request`.
+  Example: `pr_create({ title: "Fix login", base: "main", head: "fix-login" })`.
+
+## Requirements
 
 - [`gh` CLI](https://cli.github.com/) installed and authenticated (`gh auth login`)
-- [Bun](https://bun.sh/) runtime
+- [Bun](https://bun.sh/) runtime (used to run the MCP server)
+- Network access to api.github.com
 
-## Repo Scoping
+## License
 
-On startup the server detects the current Git repository and uses it as the default for all tools. Every tool accepts optional `owner` and `repo` parameters to override this for cross-repo operations.
-
-## Tools
-
-### Issues (9)
-
-| Tool | Description |
-|------|-------------|
-| `issue_create` | Create a new issue |
-| `issue_update` | Update an existing issue (title, body, state, assignees, labels, milestone) |
-| `issue_get` | Get details for a single issue by number |
-| `issue_list` | List issues with optional filters (state, labels, assignee, milestone) |
-| `issue_search` | Search issues using GitHub search syntax |
-| `issue_comment` | Add a comment to an issue |
-| `issue_pull` | Pull issues to local markdown files with YAML frontmatter for token-efficient editing |
-| `issue_push` | Push local markdown issue file(s) back to GitHub (file or directory) |
-| `issue_diff` | Compare local issue file(s) against GitHub, showing unified diff of changes |
-
-### Labels (3)
-
-| Tool | Description |
-|------|-------------|
-| `label_create` | Create a new label with name, color, and optional description |
-| `label_list` | List all labels in a repository |
-| `label_delete` | Delete a label by name |
-
-### Milestones (3)
-
-| Tool | Description |
-|------|-------------|
-| `milestone_create` | Create a new milestone with title, description, and optional due date |
-| `milestone_list` | List milestones with optional state filter |
-| `milestone_update` | Update an existing milestone (title, description, state, due date) |
-
-### Projects V2 (4)
-
-| Tool | Description |
-|------|-------------|
-| `project_list` | List projects for a user or organization |
-| `project_items` | List items in a project |
-| `project_move` | Move a project item to a different status/column |
-| `project_add` | Add an issue or PR to a project |
-
-### Pull Requests (5)
-
-| Tool | Description |
-|------|-------------|
-| `pr_create` | Create a pull request |
-| `pr_list` | List pull requests with optional filters |
-| `pr_get` | Get details for a single PR by number |
-| `pr_merge` | Merge a pull request |
-| `pr_review_request` | Request reviewers for a pull request |
-
-## Local Issue Editing Workflow
-
-Issues can be edited locally as Markdown files, then pushed back to GitHub. This enables bulk edits, offline review, and using Claude Code to reason over issue content.
-
-### `.issues/` Directory Convention
-
-When you pull issues (`issue_pull`), they are written to `.issues/` in the current working directory:
-
-```
-.issues/
-  issue-42.md       # existing issue — edit body/frontmatter, then push
-  issue-new.md      # new issue to create — picked up on next push/Stop hook
-```
-
-Files are named `issue-{number}.md` for existing issues. New issues use any filename matching `issue-new*.md` (e.g., `issue-new-auth-bug.md`).
-
-Frontmatter fields: `title`, `number`, `state`, `labels`, `assignees`, `milestone`, `updated_at`.
-
-### Creating New Issues
-
-Create a file in `.issues/` with a name matching `issue-new*.md`:
-
-```markdown
----
-title: "Fix the thing"
-labels: ["bug"]
----
-
-Body text here.
-```
-
-On the next `issue_push` call (or when the session ends via the Stop hook), the file is created as a GitHub issue and renamed to `issue-{number}.md`.
-
-### Auto-Sync Hooks
-
-The plugin installs two lifecycle hooks:
-
-- **SessionStart** — automatically pulls all issues already present in `.issues/` so your local files stay current at the start of each session.
-- **Stop** — automatically pushes any modified issue files and creates new issues from `issue-new*.md` files when the session ends.
-
-### Conflict Handling
-
-If GitHub has a newer `updated_at` timestamp than the local file, the push is skipped with a warning. Edit conflicts are never silently overwritten — you will be told which files were skipped so you can review and re-push manually.
-
-## Error Handling
-
-- Missing `gh` binary: returns a clear error pointing to installation instructions
-- Auth failure: surfaces the `gh` auth error message directly
-- API errors: passed through from the GitHub API with status codes intact
+[LICENSE](LICENSE)
