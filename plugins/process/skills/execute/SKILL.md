@@ -140,31 +140,79 @@ After all checklist items are checked, before telling the user to run review:
 
 The sibling layout keeps the worktree easy to find and avoids nested worktrees. Example: if the repo lives at `~/git/my-project`, the worktree is at `~/git/worktree-issue-42`.
 
-## Multi-Worktree (Optional Optimization)
+## Parallel Subagents with Worktree Isolation (Optional Optimization)
 
-For checklists with independent tasks that touch non-overlapping files, you can offer parallel execution using multiple worktrees. This is an optimization — default to single-worktree sequential execution unless the user opts in.
+For checklists with independent tasks that touch non-overlapping files, you can dispatch implementers in parallel. Each runs in its own isolated worktree via the `Agent` tool's `isolation: "worktree"` parameter — the harness creates, tracks, and cleans up the temporary worktree for you. Default is still single-worktree sequential execution; this mode is opt-in.
 
-**When to offer:** After parsing the checklist in step 1, analyze the tasks for file-path independence. Two tasks are independent if they modify entirely different sets of files (no shared file paths). If 2 or more consecutive tasks are independent, offer multi-worktree to the user: "Tasks N and M appear independent (no overlapping files). I can work them in parallel using separate worktrees. Want to try that?"
+**When to offer:** After parsing the checklist in step 1, analyze the unchecked tasks for file-path independence. Two tasks are independent if they modify entirely different sets of files (no shared file paths). If **2 or more** consecutive independent tasks are found, offer parallel mode:
 
-**How it works:**
-1. For each independent task, create a temporary worktree:
-   - Branch: `issue-{number}-task-{N}` (temporary)
-   - Directory: `../worktree-issue-{number}-task-{N}`
-   - Base: branch off `issue-{number}` (the main feature branch)
-2. Complete the task in its temporary worktree. Commit changes.
-3. When the task is done, merge the temporary branch back into `issue-{number}`:
-   - `cd ../worktree-issue-{number}` (main worktree)
-   - `git merge issue-{number}-task-{N}`
-   - `git worktree remove ../worktree-issue-{number}-task-{N}`
-   - `git branch -d issue-{number}-task-{N}`
-4. Tick the checkbox and sync by calling `issue_push` with the `.issues/` directory.
+> "Tasks N, M, ... appear independent (no overlapping files). I can work them in parallel, each in its own isolated worktree. Want to try that?"
 
-**Conflict handling:** If merge conflicts occur, resolve them in the main worktree, commit, and continue. If conflicts are complex, fall back to sequential execution for remaining tasks.
+If fewer than 2 independent tasks are found, **do not offer** this mode — fall through to normal subagent-driven execution.
 
-**Do not use multi-worktree when:**
-- Tasks have implicit ordering dependencies (later tasks use types/functions created by earlier tasks)
-- The user hasn't opted in
-- There are fewer than 2 independent tasks
+### Prerequisites
+
+- Execute must be running inside `../worktree-issue-{number}` when dispatching. Each isolation worktree branches off the current `HEAD`, so being on `issue-{number}` is how parallel work ends up on the feature branch. **Never dispatch with `isolation: "worktree"` from the main checkout** — the agents would branch off `main` and you'd have to cherry-pick.
+- Stay in `../worktree-issue-{number}` for merge-back too. Never `git checkout` or `git switch` in the main checkout.
+
+### How it works
+
+**Step 1 — Dispatch all independent tasks in a single message.** This is what produces actual parallelism. Put every `Agent` tool call into one assistant message:
+
+```
+Agent(isolation: "worktree", prompt: <prompt for task N>)
+Agent(isolation: "worktree", prompt: <prompt for task M>)
+Agent(isolation: "worktree", prompt: <prompt for task ...>)
+```
+
+Mark each corresponding native task (`TaskUpdate`) as `in_progress` before dispatching. Sequential `Agent` calls across multiple messages are **not** parallel — they run one after another.
+
+**Step 2 — Agent prompt contract.** Each dispatched agent's prompt must contain, at minimum:
+
+1. The **full checklist line** (the `- [ ]` bullet) plus any indented sub-bullets that belong to that item.
+2. A **pointer to the issue and its spec** for broader context: "See issue #{number} for the spec. Relevant sections: Problem, Acceptance Criteria, Edge Cases."
+3. Explicit instruction to **implement the change and commit all work** inside the isolation worktree. Partial changes that aren't committed are lost when the harness cleans up.
+4. Explicit instruction to **return the current branch name** as the last line of its response, using a delimited block so the driver can parse it reliably:
+
+   ```
+   ===BRANCH===
+   <output of `git branch --show-current`>
+   ===END===
+   ```
+
+   The harness creates a branch inside the isolation worktree; without this, execute cannot merge the work back.
+5. The same status vocabulary as the sequential flow: `DONE`, `DONE_WITH_CONCERNS`, `NEEDS_CONTEXT`, `BLOCKED`.
+
+**Step 3 — Merge returned branches sequentially into `issue-{number}`.** Once all parallel agents return, process them one at a time from inside `../worktree-issue-{number}`:
+
+For each returned branch, in the original checklist order:
+
+1. `git merge --no-ff <branch>` — keep a merge commit so the per-task work is visible in history. Do **not** rebase.
+2. Run the per-item **Spec Compliance Review** and then **Code Quality Review** (same prompts and iteration limit as Subagent-Driven Execution above). Reviews run in the issue worktree, not the (possibly already-cleaned) isolation worktree.
+3. **Only if both reviews pass:** tick `- [ ]` → `- [x]` in the local issue file, call `issue_push` with the `.issues/` directory, mark the native task `completed`, and delete the merged branch with `git branch -d <branch>`.
+4. If reviews fail, follow the existing review-iteration loop (max 3). Fixes happen in the issue worktree on top of the merge.
+
+Do **not** tick the checkbox before the per-item review passes — a merged-but-broken item would otherwise be recorded as done.
+
+### Conflict handling
+
+- **Trivial conflict** (isolated hunk, obvious resolution): resolve in `../worktree-issue-{number}`, commit, continue with the next returned branch.
+- **Non-trivial conflict** (multiple files, unclear resolution, or any conflict you cannot resolve on the first attempt): **abort remaining parallel merges**. Leave unmerged branches in place so the user can inspect them. Switch to sequential subagent-driven execution for all remaining unticked items, starting with the ones whose parallel branches were not merged.
+
+### Edge cases
+
+- **Agent returns no changes / no branch block / empty branch name.** `isolation: "worktree"` auto-cleans empty worktrees, so there is nothing to merge. Treat the item as `BLOCKED`. Do **not** silently tick it. Fall back to sequential subagent-driven execution for that item so the user sees the failure in the normal flow.
+- **Post-merge review fails repeatedly.** Use the per-task review-iteration loop's max of 3. After 3 failed iterations, escalate to the user.
+- **Agent reports `BLOCKED` or `NEEDS_CONTEXT`.** Same handling as the sequential subagent-driven section — re-dispatch with more context, break the task down, or escalate.
+- **Two agents edit overlapping files despite the independence check.** The file-path heuristic is best-effort. First merge wins; the second hits the conflict path above.
+- **Session interrupt mid-dispatch.** On resume: run `git worktree list`, identify any entries other than `../worktree-issue-{number}`, and prune stale ones (`git worktree remove --force`). Returned merge branches already committed into `issue-{number}` are safe. Unticked items are re-dispatched normally.
+
+### Do not use this mode when
+
+- Tasks have implicit ordering dependencies (later tasks use types/functions created by earlier tasks).
+- The user hasn't opted in.
+- There are fewer than 2 independent tasks.
+- You are not currently `cd`'d inside `../worktree-issue-{number}`.
 
 ## Resuming Interrupted Work
 
@@ -173,6 +221,7 @@ If a previous session was interrupted mid-checklist:
 - The issue body on GitHub shows which items are already checked (`- [x]`). These are complete — skip them.
 - Continue from the first unchecked item (`- [ ]`).
 - The worktree and branch should already exist from the previous session. Run `git worktree list` to confirm, then resume from that directory.
+- If the previous session used Parallel Subagents mode, `git worktree list` may show stale isolation worktrees (anything other than `../worktree-issue-{number}`). Prune them with `git worktree remove --force` before resuming — unmerged work in those worktrees is already lost.
 - Re-create native tasks only for the remaining unchecked items — don't create tasks for already-completed work.
 
 This is the crash-recovery model: GitHub is the persistent state. What's checked is done; what's unchecked is pending.
