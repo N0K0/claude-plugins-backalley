@@ -1,63 +1,54 @@
-# process Plugin
+# process
 
-GitHub Issues-driven development workflow with four skills: brainstorm, plan, execute, review. Heavily inspired by [superpowers](https://github.com/obra/superpowers), reimplemented with Claude Code native features (skills, agents, hooks, tasks) and a GitHub Issues layer for state management.
+GitHub Issues-driven development workflow — brainstorm, plan, execute, review — backed by skills, agents, and the gh plugin. Inspired by [superpowers](https://github.com/obra/superpowers), reimplemented on top of Claude Code native primitives with GitHub Issues as the single source of truth for workflow state.
 
-## Prerequisites
+## Install
+```
+/plugin marketplace add N0K0/claude-plugins-backalley
+/plugin install process@claude-plugins-backalley
+```
 
-- **gh plugin** must be installed from the backalley marketplace (provides `detect_repo`, `issue_pull`, `issue_push`, `issue_update`, `pr_create`, `pr_merge`)
-- **gh CLI** must be installed and authenticated (required by the gh plugin)
+## Components
+
+### Skills
+
+The four core workflow skills move an issue through `needs-spec → has-spec → in-progress → closed`:
+
+- **brainstorm** — turn an issue with `needs-spec` into a spec via guided Q&A.
+  Trigger: "brainstorm issue 42" → walks you through problem, approaches, and acceptance criteria, then writes the spec to the issue body.
+- **plan** — break the spec into a file-level implementation checklist appended to the issue.
+  Trigger: "plan issue 42" → explores the codebase and adds `- [ ]` tasks under `## Implementation Checklist`.
+- **execute** — work through the checklist in a `../worktree-issue-N` worktree, syncing progress to GitHub after each item.
+  Trigger: "work on issue 42" → resumable from the first unchecked item.
+- **review** — run final checks, open a PR with `Closes #N`, and offer to merge.
+  Trigger: "review issue 42" → cleans up the worktree after merge.
+
+Supporting skills used by the workflow (and directly invocable):
+
+- **tdd** — enforces red-green-refactor when writing implementation code.
+  Trigger: triggered automatically by `execute`, or "use TDD for this fix".
+- **debugging** — guides systematic root-cause investigation before proposing a fix.
+  Trigger: "the test is failing, debug it" → forces hypothesis/evidence loop.
+- **verify** — requires running a verification command and reading output before claiming success.
+  Trigger: "verify the build" → blocks "should pass" claims without evidence.
+- **receiving-review** — evaluate code review feedback technically before acting on it.
+  Trigger: "I got review comments on PR 50" → triages each comment.
+- **lint-issues** — audit the open issue list for label/spec/checklist consistency.
+  Trigger: "lint issues" → reports label drift, missing specs, stale checklists.
+- **parallel-agents** — dispatch independent tasks to parallel subagents with shared-state safety checks.
+  Trigger: "research these three things in parallel" → fans out one subagent per task.
+
+### Agents
+
+- **code-reviewer** — independent reviewer used by `review` and `execute` to check completed work against the spec and coding standards.
+  Example: `Agent({ subagent_type: "process:code-reviewer", prompt: "Review the diff on issue-42 against the spec in #42" })`.
+
+## Requirements
+
+- **gh plugin** from this marketplace (provides `detect_repo`, `issue_pull`, `issue_push`, `pr_create`, `pr_merge`, etc.)
+- **`gh` CLI** installed and authenticated (required by the gh plugin)
 - **git** with worktree support
 
-## Label State Machine
-```
-backlog + needs-spec  →  brainstorm  →  backlog + has-spec
-backlog + has-spec    →  plan        →  in-progress
-in-progress           →  execute     →  in-progress (checklist items ticked)
-in-progress (all done)→  review      →  closed (via PR merge + Closes #N)
-```
+## License
 
-Labels managed by the plugin: `needs-spec`, `has-spec`, `in-progress`, `backlog`.
-
-## Skills
-
-| Skill      | Triggers                                 | Entry State                       | Exit State             |
-| ---------- | ---------------------------------------- | --------------------------------- | ---------------------- |
-| brainstorm | "brainstorm issue N", "spec out issue N" | `needs-spec`                      | `has-spec`             |
-| plan       | "plan issue N", "break down issue N"     | `has-spec`                        | `in-progress`          |
-| execute    | "work on issue N", "implement issue N"   | `in-progress` + unchecked items   | checklist items ticked |
-| review     | "review issue N", "PR for issue N"       | `in-progress` + all items checked | closed (via PR)        |
-
-### brainstorm
-
-Takes an issue with `needs-spec` and writes a spec into the issue body through guided Q&A. Asks one question at a time, proposes 2-3 approaches, gets section-by-section approval.
-
-### plan
-
-Reads the spec from the issue body, explores the codebase, and appends an implementation checklist (`- [ ]` items) to the issue.
-
-### execute
-
-Creates a git worktree (`../worktree-issue-{number}` on branch `issue-{number}`), works through checklist items sequentially, and syncs progress to GitHub after each item. Resumable — picks up from the first unchecked item.
-
-### review
-
-Verifies tests pass, creates a PR with `Closes #{number}`, and offers merge or keep-open. Cleans up the worktree after merge.
-
-## Usage
-```
-# Start with an issue that has the needs-spec label
-"brainstorm issue 42"
-
-# Once spec is written, create the checklist
-"plan issue 42"
-
-# Implement the checklist items
-"work on issue 42"
-
-# Create PR and merge
-"review issue 42"
-```
-
-## Design
-
-GitHub Issues are the single source of truth. No local spec files, no local plan files. The issue body holds the spec and the implementation checklist. Labels encode workflow state. Each skill validates the issue is in the correct state before proceeding.
+[LICENSE](LICENSE)

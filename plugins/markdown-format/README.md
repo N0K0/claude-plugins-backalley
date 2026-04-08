@@ -1,27 +1,26 @@
 # markdown-format
 
-A Claude Code plugin that automatically fixes common markdown formatting issues in `.md` files after every `Write` or `Edit` tool use.
+Auto-fix common markdown formatting issues in `.md` files. After Claude writes or edits any markdown file, the plugin runs a small Python fixer pipeline and rewrites the file in place.
 
-## What It Does
-
-After Claude writes or edits a `.md` file, this plugin runs a formatting pipeline over the file and rewrites it in-place if any issues are found. Claude Code is notified with a summary of what was fixed.
-
-## Rules Applied
-
-The following fixers run in order (enabled rules are uncommented in `hooks/scripts/fixers.py`):
-
-- **Table alignment** — normalizes column widths in GFM tables
-- **Trailing whitespace** — strips trailing spaces from every line
-- **Code block spacing** — ensures blank lines around fenced code blocks
-- **Heading spacing** — ensures blank lines above and below ATX headings
-- **List markers** — normalizes unordered list markers to `-`
-
-## Installation
-
-Install via the marketplace or copy the plugin directory into your Claude Code plugins folder, then run `/reload-plugins`.
-
+## Install
 ```
-~/.claude/plugins/marketplaces/<marketplace>/plugins/markdown-format/
+/plugin marketplace add N0K0/claude-plugins-backalley
+/plugin install markdown-format@claude-plugins-backalley
 ```
 
-No additional dependencies are required — the hook script uses the Python standard library only.
+## Components
+
+### Hooks
+
+- **PostToolUse:Write** — runs `format-markdown.py` on the written file. If any fixers change content, the file is rewritten and Claude is told what was fixed.
+- **PostToolUse:Edit** — same as above, triggered after `Edit` tool calls. Ensures every edit produces clean markdown without extra prompting.
+
+The fixers (in `hooks/scripts/fixers.py`) currently handle: GFM table alignment, trailing whitespace, blank lines around fenced code blocks, blank lines around ATX headings, and unordered list marker normalization to `-`.
+
+## Requirements
+
+- `python3` available on `PATH` (standard library only — no extra packages)
+
+## License
+
+[LICENSE](LICENSE)
