@@ -12,8 +12,10 @@ Auto-fix common markdown formatting issues in `.md` files. After Claude writes o
 
 ### Hooks
 
-- **PostToolUse:Write** — runs `format-markdown.py` on the written file. If any fixers change content, the file is rewritten and Claude is told what was fixed.
-- **PostToolUse:Edit** — same as above, triggered after `Edit` tool calls. Ensures every edit produces clean markdown without extra prompting.
+- **PostToolUse:Write / Edit** — `track-markdown.py` records the touched `.md` path to a per-session tracking file in `$TMPDIR`. The file itself is not modified yet.
+- **Stop** — `format-markdown.py` runs at end of turn, reads the tracked paths, runs the fixer pipeline on each, and rewrites any file that changed. Claude is told what was fixed and the tracking file is cleared.
+
+Deferring the rewrite to end of turn means Claude sees the content it just wrote for the rest of the turn, instead of observing its own edits being reshuffled underneath it.
 
 The fixers (in `hooks/scripts/fixers.py`) currently handle: GFM table alignment, trailing whitespace, blank lines around fenced code blocks, blank lines around ATX headings, and unordered list marker normalization to `-`.
 
