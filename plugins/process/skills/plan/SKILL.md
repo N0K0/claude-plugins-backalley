@@ -1,28 +1,43 @@
 ---
 name: plan
-description: "Use when breaking a specified issue into implementation tasks — reads the spec from the issue body, explores the codebase, and writes a checklist. Triggers on: 'plan issue N', 'break down issue N', 'checklist for issue N'."
+description: "Use when breaking a specified issue into implementation tasks — reads the spec from a GitHub issue body or a local markdown file, explores the codebase, and writes a checklist. Triggers on: 'plan issue N', 'break down issue N', 'checklist for issue N'."
 ---
 # Plan
 
-**Announce at start:** "I'm using the plan skill to break down issue #N into tasks."
+**Announce at start:** "I'm using the plan skill to break down <issue #N | docs/specs/<slug>.md> into tasks."
 
-**Core principle:** The implementation checklist lives in the issue body. No local plan files.
+**Core principle:** The implementation checklist lives alongside the spec. GH mode appends it to the issue body; local mode appends it to `docs/specs/<slug>.md`. No separate plan files.
 
 ## Entry Gate
 
-Before doing any work, run these checks in order:
+Before doing any work, detect the **mode** and run the mode-specific gate.
 
-1. Call `detect_repo` to set repo context. If the tool is not available, stop with: "The gh plugin is required. Install it from the backalley marketplace."
-2. Call `issue_pull` with the `.issues/` directory path to sync all issues locally.
-3. Read the issue file (`.issues/issue-{N}.md`) and check its labels.
-4. If the `has-spec` label is NOT present, stop with: "Issue #{N} doesn't have the `has-spec` label. [If needs-spec: Run brainstorm first. If in-progress: Run execute instead.]"
-5. Check if the issue body already contains a `## Implementation Checklist` section. If it does, stop with: "Issue #{N} already has a checklist. Run execute to work through it."
+### Mode detection
 
-Do not proceed past the entry gate unless all five checks pass.
+1. If the user said "plan issue N" (numeric), that's **GH mode**.
+2. If a local `docs/specs/<slug>.md` file was referenced (by slug or path), that's **local mode**.
+3. If neither is explicit: prefer the mode whose artifact already exists. If `.issues/issue-{N}.md` exists → GH mode. If `docs/specs/<slug>.md` exists → local mode.
+4. If still ambiguous and the gh plugin is available, call `detect_repo` and default to GH mode. If `detect_repo` is missing or fails, use local mode.
+5. If both paths remain viable, ask once: "Plan against a GitHub issue or a local spec file?"
+
+Announce the chosen mode at the start.
+
+### GH mode gate
+
+1. Call `issue_pull` with the `.issues/` directory path to sync all issues locally.
+2. Read `.issues/issue-{N}.md` and check labels. If the `has-spec` label is NOT present, stop with: "Issue #{N} doesn't have the `has-spec` label. [If needs-spec: Run brainstorm first. If in-progress: Run execute instead.]"
+3. Check if the issue body already contains a `## Implementation Checklist` section. If it does, stop with: "Issue #{N} already has a checklist. Run execute to work through it."
+
+### Local mode gate
+
+1. Read `docs/specs/<slug>.md` and check frontmatter `status:`. If not `has-spec`, stop with: "`docs/specs/<slug>.md` has status `<X>`. [If needs-spec: Run brainstorm. If in-progress: Run execute.]"
+2. Check if the file body already contains a `## Implementation Checklist` section. If it does, stop with: "`docs/specs/<slug>.md` already has a checklist. Run execute to work through it."
+
+Do not proceed past the entry gate unless all checks pass.
 
 ## The Process
 
-1. Read the spec from the issue body carefully. Understand the full scope: what is being built, what constraints apply, and what the success criteria are.
+1. Read the spec carefully (issue body or local file body). Understand the full scope: what is being built, what constraints apply, and what the success criteria are.
 
 2. Explore the codebase to understand what needs to change. Look for:
    - Files and directories relevant to the feature area
@@ -30,25 +45,29 @@ Do not proceed past the entry gate unless all five checks pass.
    - Dependencies that the new code will rely on or affect
    - Tests and configuration that will need updating
 
-3. Break the spec into ordered, concrete, file-level tasks. Each task should be independent enough to be completed in sequence without ambiguity. Order matters — put scaffolding before implementation, implementation before tests, tests before docs.
+3. Break the spec into ordered, concrete, file-level tasks. Each task should be independent enough to be completed in sequence without ambiguity. Order matters — scaffolding before implementation, implementation before tests, tests before docs.
 
 4. Format the tasks as GitHub-flavored checkboxes under a `## Implementation Checklist` heading (see format below).
 
-5. Show the checklist to the user for approval before pushing. Wait for explicit confirmation.
+5. Show the checklist to the user for approval before persisting. Wait for explicit confirmation.
 
-6. Once approved, append the checklist to the issue body below the spec. Call `issue_push` with the `.issues/` directory to sync all issues.
+6. Once approved, append the checklist to the spec destination:
+   - **GH mode:** append to the local issue file body, then call `issue_push` to sync.
+   - **Local mode:** append to `docs/specs/<slug>.md`. No push.
 
-7. **Link to umbrella issue (if applicable):**
-   - Check the issue body for a `Parent: #N` line. If found, N is the umbrella issue number.
-   - If no `Parent:` line exists, call `issue_search` with `body_contains: "#ISSUE_NUMBER"` and `state: open` to find issues whose body references this issue. Filter results to those containing a GitHub tasklist (`- [ ]` or `- [x]` items) that includes this issue number. If exactly one match is found, that is the umbrella.
-   - If multiple candidates are found, ask the user: "I found multiple issues referencing #N: #A, #B. Which is the umbrella issue, or none?"
-   - If an umbrella issue is identified: the umbrella file is already local from the full pull. Check if `#ISSUE_NUMBER` already appears in the umbrella's tasklist, and if not, append `- [ ] #ISSUE_NUMBER` to the umbrella's tasklist. The changes will be synced on the next `issue_push` of the `.issues/` directory.
+7. **Link to umbrella (if applicable):**
+   - Check the spec body for a `Parent: #N` line (GH mode) or `Parent: docs/specs/<other>.md` line (local mode).
+   - **GH mode, no explicit parent:** call `issue_search` with `body_contains: "#ISSUE_NUMBER"` and `state: open`. Filter to results containing a GitHub tasklist that includes this issue. If exactly one match, that's the umbrella. If multiple, ask the user which.
+   - **GH mode with umbrella:** check if `#ISSUE_NUMBER` already appears in the umbrella's tasklist; if not, append `- [ ] #ISSUE_NUMBER`. Synced on next `issue_push`.
+   - **Local mode with umbrella:** append `- [ ] docs/specs/<child>.md` to the umbrella file's tasklist (create one if missing).
 
 8. Create native Claude Code tasks via `TaskCreate` for session tracking — one task per checklist item.
 
-9. Call `issue_update` to remove the `backlog` and `has-spec` labels and add `in-progress`.
+9. **Transition status:**
+   - **GH mode:** call `issue_update` to remove `backlog` and `has-spec` labels and add `in-progress`.
+   - **Local mode:** update the frontmatter `status: has-spec` → `status: in-progress`.
 
-10. Tell the user: "Checklist added to issue #N. Run `execute` to start implementation."
+10. Tell the user: "Checklist added to <issue #N | docs/specs/<slug>.md>. Run `execute` to start implementation."
 
 ## Checklist Format
 
@@ -65,40 +84,44 @@ Tasks should be concrete and file-level — "Create X in Y" or "Modify Z to add 
 
 ## Common Mistakes
 
-**Problem:** Writing the plan to a local file.
-**Fix:** The checklist lives in the issue body. Push via `issue_push`. Local plan files are out of scope and will be stale immediately.
+**Problem:** Skipping mode detection and defaulting to GH when the spec lives in `docs/specs/`.
+**Fix:** Always run mode detection first. If the spec file is local, stay in local mode.
+
+**Problem:** Writing the plan to a separate file when the spec is elsewhere.
+**Fix:** The checklist lives in the same place as the spec — issue body or `docs/specs/<slug>.md`.
 
 **Problem:** Skipping codebase exploration.
-**Fix:** Always explore first — you need to know existing patterns, file locations, and dependencies before writing concrete tasks. A checklist written without exploration will contain wrong file names, duplicate code, and missed edge cases.
+**Fix:** Always explore first — patterns, file locations, and dependencies must inform the tasks.
 
 **Problem:** Vague checklist items.
-**Fix:** Every item should name specific files and describe a concrete change. "Implement the feature" is too vague. "Add `handleFoo` to `src/handlers/foo.ts`" is concrete.
+**Fix:** Every item should name specific files and describe a concrete change.
 
 **Problem:** Forgetting native task creation.
-**Fix:** Call `TaskCreate` for each checklist item so progress is visible in the session. Without this, the session has no awareness of what's been done.
+**Fix:** Call `TaskCreate` for each checklist item so progress is visible in the session.
 
 ## Red Flags
 
 **Never:**
-- Write the plan to a local file
 - Skip codebase exploration before writing tasks
 - Create checklist items without concrete file paths
-- Push the checklist without explicit user approval
+- Persist the checklist without explicit user approval
+- Split the spec and checklist across two storage locations
 
 **Always:**
+- Detect mode at the entry gate and announce which mode is active
 - Explore the codebase first — patterns and locations matter
 - Name specific files in each task
-- Get user approval on the checklist before pushing
+- Get user approval on the checklist before persisting
 - Create native tasks for session tracking
-- Link to umbrella issue if one exists
-- Transition labels after pushing (`backlog` + `has-spec` → `in-progress`)
+- Link to umbrella if one exists
+- Transition status after persisting
 
 ## Integration
 
-**Requires:** gh plugin (`detect_repo`, `issue_pull`, `issue_push`, `issue_update`, `issue_search`)
+**Requires (GH mode only):** gh plugin (`detect_repo`, `issue_pull`, `issue_push`, `issue_update`, `issue_search`). Local mode has no external dependencies.
 
-**Previous skill:** `brainstorm` (wrote the spec into the issue body)
+**Previous skill:** `brainstorm` (wrote the spec)
 
 **Next skill:** `execute` (works through the checklist)
 
-**Label transition:** removes `backlog` + `has-spec`, adds `in-progress`
+**Status transition:** `has-spec` (+ `backlog` in GH) → `in-progress`

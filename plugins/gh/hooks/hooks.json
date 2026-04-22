@@ -1,18 +1,6 @@
 {
-  "description": "Auto-sync GitHub issue files in .issues/ and guard against gh CLI issue commands",
+  "description": "Auto-sync GitHub issue files in .issues/",
   "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/scripts/warn-gh-cli-issues.sh",
-            "timeout": 5
-          }
-        ]
-      }
-    ],
     "SessionStart": [
       {
         "matcher": "*",

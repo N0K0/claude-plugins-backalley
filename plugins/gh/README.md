@@ -19,7 +19,6 @@ MCP server for the GitHub CLI with a local-file workflow for issues. Pull issues
 
 - **SessionStart** — runs `session-start-pull.sh` to refresh any issue files already present in `.issues/`, so local files start the session up to date.
 - **Stop** — runs `stop-push.sh` to push modified issue files (and create new ones from `issue-new*.md`) when the session ends.
-- **PreToolUse:Bash** — runs `warn-gh-cli-issues.sh` to discourage using `gh issue …` shell commands when MCP tools should be used instead.
 
 ### MCP servers
 
