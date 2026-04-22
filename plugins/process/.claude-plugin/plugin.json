@@ -1,9 +1,9 @@
 {
   "name": "process",
-  "description": "GitHub Issues-driven development workflow — brainstorm, plan, execute, review, with TDD, debugging, and verification skills",
+  "description": "Spec-driven development workflow — brainstorm, plan, execute, review — using GitHub Issues or local markdown files, with TDD, debugging, and verification skills",
   "author": {
     "name": "nikolas"
   },
-  "version": "0.6.1",
+  "version": "0.7.0",
   "keywords": ["workflow", "process", "github", "issues", "development"]
 }
