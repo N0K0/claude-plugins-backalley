@@ -1,8 +1,8 @@
 ---
-name: brainstorm
-description: "Brainstorm requirements, propose approaches, and write a spec to a GitHub issue or a local markdown file. Triggers on: 'brainstorm issue N', 'spec out issue N', 'specify issue N', 'brainstorm <topic>'."
+name: spec-issue
+description: "Brainstorm requirements, propose approaches, and write a spec to a GitHub issue or a local markdown file. Triggers on: 'spec issue N', 'brainstorm issue N', 'spec out issue N', 'specify issue N', 'brainstorm <topic>'."
 ---
-# Brainstorm
+# Spec Issue
 
 **Core principle:** One spec, one source of truth. The GitHub Issue body if we're using the issues workflow; otherwise a local markdown file at `docs/specs/<slug>.md`.
 
@@ -18,17 +18,17 @@ Before doing any work, detect the **mode** (GH issues vs local markdown), then r
 4. Otherwise, call `detect_repo` to probe. If the tool is missing or returns an error, use **local mode**.
 5. If both paths remain viable (gh is available AND no existing file disambiguates), ask once: "Write this spec to a GitHub issue or a local file at `docs/specs/<slug>.md`?" Default to GH.
 
-Announce the chosen mode at the start of the run, e.g. "I'm using the brainstorm skill in **local mode** to spec out `<slug>`."
+Announce the chosen mode at the start of the run, e.g. "I'm using the spec-issue skill in **local mode** to spec out `<slug>`."
 
 ### GH mode gate
 
 1. Call `issue_pull` with the `.issues/` directory path to sync all issues locally.
-2. **Existing issue (issue number provided):** read `.issues/issue-{N}.md` and check labels. If the `needs-spec` label is NOT present, stop with: "Issue #{N} doesn't have the `needs-spec` label. [If has-spec: Run plan instead. If in-progress: Run execute instead.]"
+2. **Existing issue (issue number provided):** read `.issues/issue-{N}.md` and check labels. If the `needs-spec` label is NOT present, stop with: "Issue #{N} doesn't have the `needs-spec` label. [If has-spec: Run plan-issue instead. If in-progress: Run execute-issue instead.]"
 3. **New issue:** create a new issue file at `.issues/issue-new.md` with a placeholder title, the `needs-spec` label, and an empty body. Do NOT push yet.
 
 ### Local mode gate
 
-1. If `docs/specs/<slug>.md` exists, read it and check its frontmatter `status:` field. If `status` is not `needs-spec` (missing, or already `has-spec` / `in-progress`), stop with: "`docs/specs/<slug>.md` has status `<X>`. [If has-spec: Run plan. If in-progress: Run execute.]"
+1. If `docs/specs/<slug>.md` exists, read it and check its frontmatter `status:` field. If `status` is not `needs-spec` (missing, or already `has-spec` / `in-progress`), stop with: "`docs/specs/<slug>.md` has status `<X>`. [If has-spec: Run plan-issue. If in-progress: Run execute-issue.]"
 2. If the file doesn't exist, create it with this frontmatter and an empty body:
 
    ```yaml
@@ -74,7 +74,7 @@ Do not proceed past the entry gate unless all checks pass.
     - **GH mode:** call `issue_update` to remove the `needs-spec` label and add `has-spec`.
     - **Local mode:** update the frontmatter `status: needs-spec` → `status: has-spec`.
 
-12. Tell the user: "Spec written to <issue #N | docs/specs/<slug>.md>. Run `plan` to create the implementation checklist."
+12. Tell the user: "Spec written to <issue #N | docs/specs/<slug>.md>. Run `plan-issue` to create the implementation checklist."
 
 ## Internal Review Loop
 
@@ -170,12 +170,12 @@ When the user says "check for feedback", "there's feedback on GitHub", or simila
 - Ask one question at a time
 - Run internal review (checklist gate + subagent) before transitioning status
 - Transition status after the spec is written
-- Tell the user what to run next (`plan`)
+- Tell the user what to run next (`plan-issue`)
 
 ## Integration
 
 **Requires (GH mode only):** gh plugin (`detect_repo`, `issue_pull`, `issue_push`, `issue_update`, `issue_comments_list`). Local mode has no external dependencies.
 
-**Next skill:** `plan` (creates the implementation checklist from the spec)
+**Next skill:** `plan-issue` (creates the implementation checklist from the spec)
 
 **Status transition:** `needs-spec` → `has-spec` (label in GH mode, frontmatter field in local mode)

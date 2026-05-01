@@ -1,10 +1,10 @@
 ---
-name: plan
+name: plan-issue
 description: "Use when breaking a specified issue into implementation tasks — reads the spec from a GitHub issue body or a local markdown file, explores the codebase, and writes a checklist. Triggers on: 'plan issue N', 'break down issue N', 'checklist for issue N'."
 ---
-# Plan
+# Plan Issue
 
-**Announce at start:** "I'm using the plan skill to break down <issue #N | docs/specs/<slug>.md> into tasks."
+**Announce at start:** "I'm using the plan-issue skill to break down <issue #N | docs/specs/<slug>.md> into tasks."
 
 **Core principle:** The implementation checklist lives alongside the spec. GH mode appends it to the issue body; local mode appends it to `docs/specs/<slug>.md`. No separate plan files.
 
@@ -25,13 +25,13 @@ Announce the chosen mode at the start.
 ### GH mode gate
 
 1. Call `issue_pull` with the `.issues/` directory path to sync all issues locally.
-2. Read `.issues/issue-{N}.md` and check labels. If the `has-spec` label is NOT present, stop with: "Issue #{N} doesn't have the `has-spec` label. [If needs-spec: Run brainstorm first. If in-progress: Run execute instead.]"
-3. Check if the issue body already contains a `## Implementation Checklist` section. If it does, stop with: "Issue #{N} already has a checklist. Run execute to work through it."
+2. Read `.issues/issue-{N}.md` and check labels. If the `has-spec` label is NOT present, stop with: "Issue #{N} doesn't have the `has-spec` label. [If needs-spec: Run spec-issue first. If in-progress: Run execute-issue instead.]"
+3. Check if the issue body already contains a `## Implementation Checklist` section. If it does, stop with: "Issue #{N} already has a checklist. Run execute-issue to work through it."
 
 ### Local mode gate
 
-1. Read `docs/specs/<slug>.md` and check frontmatter `status:`. If not `has-spec`, stop with: "`docs/specs/<slug>.md` has status `<X>`. [If needs-spec: Run brainstorm. If in-progress: Run execute.]"
-2. Check if the file body already contains a `## Implementation Checklist` section. If it does, stop with: "`docs/specs/<slug>.md` already has a checklist. Run execute to work through it."
+1. Read `docs/specs/<slug>.md` and check frontmatter `status:`. If not `has-spec`, stop with: "`docs/specs/<slug>.md` has status `<X>`. [If needs-spec: Run spec-issue. If in-progress: Run execute-issue.]"
+2. Check if the file body already contains a `## Implementation Checklist` section. If it does, stop with: "`docs/specs/<slug>.md` already has a checklist. Run execute-issue to work through it."
 
 Do not proceed past the entry gate unless all checks pass.
 
@@ -67,7 +67,7 @@ Do not proceed past the entry gate unless all checks pass.
    - **GH mode:** call `issue_update` to remove `backlog` and `has-spec` labels and add `in-progress`.
    - **Local mode:** update the frontmatter `status: has-spec` → `status: in-progress`.
 
-10. Tell the user: "Checklist added to <issue #N | docs/specs/<slug>.md>. Run `execute` to start implementation."
+10. Tell the user: "Checklist added to <issue #N | docs/specs/<slug>.md>. Run `execute-issue` to start implementation."
 
 ## Checklist Format
 
@@ -120,8 +120,8 @@ Tasks should be concrete and file-level — "Create X in Y" or "Modify Z to add 
 
 **Requires (GH mode only):** gh plugin (`detect_repo`, `issue_pull`, `issue_push`, `issue_update`, `issue_search`). Local mode has no external dependencies.
 
-**Previous skill:** `brainstorm` (wrote the spec)
+**Previous skill:** `spec-issue` (wrote the spec)
 
-**Next skill:** `execute` (works through the checklist)
+**Next skill:** `execute-issue` (works through the checklist)
 
 **Status transition:** `has-spec` (+ `backlog` in GH) → `in-progress`

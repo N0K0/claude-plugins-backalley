@@ -102,5 +102,5 @@ Return: Summary of root cause and what you fixed.
 ## Integration
 
 **Works with:**
-- `process:execute` — multi-worktree optimization for independent checklist items
+- `process:execute-issue` — multi-worktree optimization for independent checklist items
 - `process:debugging` — when multiple independent failures need investigation

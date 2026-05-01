@@ -1,10 +1,10 @@
 ---
-name: execute
+name: execute-issue
 description: "Implements an issue's checklist by creating a worktree, working through tasks, ticking checkboxes, and syncing to GitHub. Triggers on: 'work on issue N', 'implement issue N', 'execute issue N'."
 ---
-# Execute
+# Execute Issue
 
-**Announce at start:** "I'm using the execute skill to implement issue #N."
+**Announce at start:** "I'm using the execute-issue skill to implement issue #N."
 
 **Core principle:** Sync to GitHub after every completed checklist item. If the session crashes, progress is preserved.
 
@@ -15,11 +15,13 @@ Before doing any work, run these checks in order:
 1. Call `detect_repo` to set repo context. If the tool is not available, stop with: "The gh plugin is required. Install it from the backalley marketplace."
 2. Call `issue_pull` with the `.issues/` directory path to sync all issues locally.
 3. Read the issue file (`.issues/issue-{N}.md`) and check its labels.
-4. If the `in-progress` label is NOT present, stop with: "Issue #{N} doesn't have the `in-progress` label. [If needs-spec: Run brainstorm first. If has-spec: Run plan first.]"
-5. Parse the issue body for checklist items (`- [ ]` and `- [x]`). If there are no checklist items, stop with: "Issue #{N} has no checklist. Run plan to create one."
-6. If ALL items are already checked (`- [x]`), stop with: "All checklist items are complete. Run review to create a PR."
+4. If the `in-progress` label is NOT present, stop with: "Issue #{N} doesn't have the `in-progress` label. [If needs-spec: Run spec-issue first. If has-spec: Run plan-issue first.]"
+5. Parse the issue body for checklist items (`- [ ]` and `- [x]`). If there are no checklist items, stop with: "Issue #{N} has no checklist. Run plan-issue to create one."
+6. If ALL items are already checked (`- [x]`), stop with: "All checklist items are complete. Run finish-issue to create a PR."
 
 Proceed only after all six checks pass.
+
+7. Extract the plan working file: parse `.issues/issue-{N}.md` for the `## Implementation Checklist` section and write just that section (heading + all `- [ ]` / `- [x]` items) to `.issues/issue-{N}.plan.md`. Recreate this file fresh every time the skill is invoked — it is ephemeral and regenerable from the issue body at any time. The issue body is the source of truth.
 
 ## Execution Mode
 
@@ -38,7 +40,7 @@ Options:
 
 1. Parse the checklist: identify unchecked (`- [ ]`) items as remaining work. Note which items are already checked (`- [x]`) — those are done.
 
-2. Create native Claude Code tasks via `TaskCreate` for each unchecked item. These provide session-level progress tracking.
+2. Create native Claude Code tasks via `TaskCreate` — **one task per checklist item, not per subtask**. Each checklist item is a phase; the implementer's internal steps (file edits, test runs, etc.) are not separate tasks. The only exception is when a subtask is something the harness can run as a script (e.g. a single Bash command that fully completes the work) — then it's fine to track that script invocation as its own task.
 
 3. Set up the worktree:
    - Run `git worktree list` to check if a worktree already exists at `../worktree-issue-{number}`.
@@ -51,7 +53,7 @@ Options:
 
 5. After all items are checked, run the **Final Quality Review** (see below).
 
-6. When all items are checked and the quality review passes, tell the user: "All tasks complete for issue #N. Run `review` to create a PR."
+6. When all items are checked and the quality review passes, tell the user: "All tasks complete for issue #N. Run `finish-issue` to create a PR."
 
 ## Direct Execution
 
@@ -61,7 +63,7 @@ For each unchecked item in order:
 2. Follow `process:tdd` — write failing test first, then implement.
 3. Commit the changes with a descriptive message referencing the checklist item.
 4. Mark the native task as `completed`.
-5. In the local issue file, change `- [ ]` to `- [x]` for this item.
+5. Change `- [ ]` to `- [x]` for this item in both `.issues/issue-{N}.plan.md` and `.issues/issue-{N}.md` (under `## Implementation Checklist`).
 6. Call `issue_push` with the `.issues/` directory to sync all issues to GitHub.
 
 ## Subagent-Driven Execution
@@ -74,7 +76,7 @@ For each unchecked item in order:
 
 Mark the native task as `in_progress`, then dispatch a subagent using the template in `implementer-prompt.md`. Provide:
 - Full text of the checklist item
-- Context about the issue and what's already implemented
+- Context about the issue and what's already implemented (load from `.issues/issue-{N}.plan.md` for the checklist context; the full spec is in `.issues/issue-{N}.md` if broader context is needed)
 - The worktree directory to work in
 
 ### Step 2: Handle Implementer Status
@@ -111,7 +113,7 @@ Dispatch a spec compliance reviewer using `spec-reviewer-prompt.md`. This verifi
 ### Step 5: Complete Item
 
 1. Mark the native task as `completed`.
-2. In the local issue file, change `- [ ]` to `- [x]` for this item.
+2. Change `- [ ]` to `- [x]` for this item in both `.issues/issue-{N}.plan.md` and `.issues/issue-{N}.md` (under `## Implementation Checklist`).
 3. Call `issue_push` with the `.issues/` directory to sync all issues to GitHub.
 
 Then proceed to the next unchecked item.
@@ -136,7 +138,7 @@ After all checklist items are checked, before telling the user to run review:
 - **Branch:** `issue-{number}`
 - Always work in the worktree directory, never on main/master
 - **Never run `git checkout` or `git switch` in the main worktree.** Multiple Claude Code sessions share the same checkout — switching branches in the main worktree will break every other running session. All branch operations (checkout, merge, rebase) must happen inside an isolated worktree.
-- The worktree is cleaned up by the review skill after merge
+- The worktree is cleaned up by the finish-issue skill after merge
 
 The sibling layout keeps the worktree easy to find and avoids nested worktrees. Example: if the repo lives at `~/git/my-project`, the worktree is at `~/git/worktree-issue-42`.
 
@@ -189,7 +191,7 @@ For each returned branch, in the original checklist order:
 
 1. `git merge --no-ff <branch>` — keep a merge commit so the per-task work is visible in history. Do **not** rebase.
 2. Run the per-item **Spec Compliance Review** and then **Code Quality Review** (same prompts and iteration limit as Subagent-Driven Execution above). Reviews run in the issue worktree, not the (possibly already-cleaned) isolation worktree.
-3. **Only if both reviews pass:** tick `- [ ]` → `- [x]` in the local issue file, call `issue_push` with the `.issues/` directory, mark the native task `completed`, and delete the merged branch with `git branch -d <branch>`.
+3. **Only if both reviews pass:** tick `- [ ]` → `- [x]` in both `.issues/issue-{N}.plan.md` and `.issues/issue-{N}.md` (under `## Implementation Checklist`), call `issue_push` with the `.issues/` directory, mark the native task `completed`, and delete the merged branch with `git branch -d <branch>`.
 4. If reviews fail, follow the existing review-iteration loop (max 3). Fixes happen in the issue worktree on top of the merge.
 
 Do **not** tick the checkbox before the per-item review passes — a merged-but-broken item would otherwise be recorded as done.
@@ -223,6 +225,7 @@ If a previous session was interrupted mid-checklist:
 - The worktree and branch should already exist from the previous session. Run `git worktree list` to confirm, then resume from that directory.
 - If the previous session used Parallel Subagents mode, `git worktree list` may show stale isolation worktrees (anything other than `../worktree-issue-{number}`). Prune them with `git worktree remove --force` before resuming — unmerged work in those worktrees is already lost.
 - Re-create native tasks only for the remaining unchecked items — don't create tasks for already-completed work.
+- Re-derive `.issues/issue-{N}.plan.md` from the freshly pulled issue body (entry gate step 7) so the plan working file reflects current checked/unchecked state.
 
 This is the crash-recovery model: GitHub is the persistent state. What's checked is done; what's unchecked is pending.
 
@@ -259,8 +262,8 @@ This is the crash-recovery model: GitHub is the persistent state. What's checked
 - `spec-reviewer-prompt.md` — Subagent dispatch for spec compliance
 - `code-quality-reviewer-prompt.md` — Subagent dispatch for code quality
 
-**Previous skill:** `plan` (created the checklist in the issue body)
+**Previous skill:** `plan-issue` (created the checklist in the issue body)
 
-**Next skill:** `review` (creates PR and merges)
+**Next skill:** `finish-issue` (creates PR and merges)
 
 **No label transition** — issue stays `in-progress` while checklist items are ticked

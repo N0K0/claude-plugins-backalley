@@ -1,10 +1,10 @@
 ---
-name: review
-description: "Use when an issue's checklist is fully complete — verifies tests, creates a PR, and optionally merges. Triggers on: 'review issue N', 'PR for issue N', 'merge issue N'."
+name: finish-issue
+description: "Use when an issue's checklist is fully complete — verifies tests, creates a PR, and optionally merges. Triggers on: 'finish issue N', 'review issue N', 'PR for issue N', 'merge issue N'."
 ---
-# Review
+# Finish Issue
 
-**Announce at start:** "I'm using the review skill to create a PR for issue #N."
+**Announce at start:** "I'm using the finish-issue skill to create a PR for issue #N."
 
 **Core principle:** The PR's `Closes #N` handles issue closure automatically. No manual label changes needed.
 
@@ -15,9 +15,9 @@ Before doing any work, run these checks in order:
 1. Call `detect_repo` to set repo context. If the tool is not available, stop with: "The gh plugin is required. Install it from the backalley marketplace."
 2. Call `issue_pull` with the `.issues/` directory path to sync all issues locally.
 3. Read the issue file (`.issues/issue-{N}.md`) and check its labels.
-4. If the `in-progress` label is NOT present, stop with: "Issue #{N} doesn't have the `in-progress` label. [If needs-spec: Run brainstorm first. If has-spec: Run plan first.]"
-5. Parse the checklist. If ANY items are unchecked (`- [ ]`), stop with: "Issue #{N} has unchecked items. Run execute to complete them first."
-6. Run the project's test commands. Look for test scripts in `package.json` (`scripts.test`), a `Makefile` (`make test`), or other common test runners. If tests fail, stop with: "Tests are failing. Run execute to fix them before creating a PR."
+4. If the `in-progress` label is NOT present, stop with: "Issue #{N} doesn't have the `in-progress` label. [If needs-spec: Run spec-issue first. If has-spec: Run plan-issue first.]"
+5. Parse the checklist. If ANY items are unchecked (`- [ ]`), stop with: "Issue #{N} has unchecked items. Run execute-issue to complete them first."
+6. Run the project's test commands. Look for test scripts in `package.json` (`scripts.test`), a `Makefile` (`make test`), or other common test runners. If tests fail, stop with: "Tests are failing. Run execute-issue to fix them before creating a PR."
 
 Do not proceed past the entry gate unless all six checks pass.
 
@@ -122,6 +122,6 @@ When the user says "check for feedback", "there are review comments", or similar
 - `process:receiving-review` — How to handle review feedback with technical rigor
 - `process:verify` — Evidence before completion claims
 
-**Previous skill:** `execute` (completed all checklist items)
+**Previous skill:** `execute-issue` (completed all checklist items)
 
 **Label transition:** Issue closed automatically via `Closes #N` when PR merges
