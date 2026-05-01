@@ -16,6 +16,14 @@
       "category": "development"
     },
     {
+      "name": "guardrails",
+      "description": "Quality-of-life guardrail hooks: block sleep-chains, shell file readers, destructive ops, secret writes; require completed tasks before Stop",
+      "author": {
+        "name": "nikolas"
+      },
+      "source": "./plugins/guardrails"
+    },
+    {
       "name": "markdown-format",
       "description": "Auto-fix common markdown formatting issues in .md files",
       "author": {

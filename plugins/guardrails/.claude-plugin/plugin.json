@@ -1,0 +1,9 @@
+{
+  "name": "guardrails",
+  "description": "Quality-of-life guardrail hooks: block sleep-chains, shell file readers, destructive ops, secret writes; require completed tasks before Stop",
+  "author": {
+    "name": "nikolas"
+  },
+  "version": "0.1.0",
+  "keywords": ["hooks", "guardrails", "safety", "dx"]
+}
