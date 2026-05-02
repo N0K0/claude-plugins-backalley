@@ -44,7 +44,7 @@ export async function findIssueFiles(dir: string): Promise<IssueFileSet> {
   const newIssues: NewIssueFile[] = [];
 
   for (const name of entries) {
-    const numMatch = name.match(/^issue-(\d+)\.md$/);
+    const numMatch = name.match(/^issue-(\d+)(?:-[^/]*)?\.md$/);
     if (numMatch) {
       numbered.push({ name, path: join(dir, name), number: parseInt(numMatch[1]) });
       continue;

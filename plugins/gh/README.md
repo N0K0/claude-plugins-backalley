@@ -13,7 +13,7 @@ MCP server for the GitHub CLI with a local-file workflow for issues. Pull issues
 ### Skills
 
 - **create-issue** — write a new issue as a local markdown file with frontmatter; auto-synced to GitHub on Stop hook or manual push.
-  Example: ask "create an issue titled 'Fix login redirect' with the bug label" — Claude writes `.issues/issue-new-login.md` and the Stop hook pushes it.
+  Example: ask "create an issue titled 'Fix login redirect' with the bug label" — Claude writes `.issues/issue-new-login.md` and the Stop hook pushes it, renaming to `issue-{number}-fix-login-redirect.md`.
 
 ### Hooks
 
@@ -26,7 +26,7 @@ The plugin ships one MCP server (`gh`) wrapping the `gh` CLI. Tools are grouped 
 
 - **Repo detection** — `detect_repo` sets the default owner/repo from a local git path so other tools don't need explicit repo args.
   Example tool call: `detect_repo({ path: "/home/me/git/myproject" })`.
-- **Issue local-file sync** — `issue_pull`, `issue_push`, `issue_diff` move issues between GitHub and `.issues/*.md` files with comment sync and conflict detection.
+- **Issue local-file sync** — `issue_pull`, `issue_push`, `issue_diff` move issues between GitHub and `.issues/*.md` files with comment sync and conflict detection. Files are named `issue-{number}-{title-slug}.md`; legacy `issue-{N}.md` files are migrated on next pull.
   Example: `issue_pull({ path: ".issues", state: "open" })` writes every open issue as a markdown file.
 - **Issue CRUD & search** — `issue_create`, `issue_update`, `issue_get`, `issue_list`, `issue_search`, `issue_comment` for direct API access without the local file dance.
   Example: `issue_search({ body_contains: "OOM", labels: "bug" })`.

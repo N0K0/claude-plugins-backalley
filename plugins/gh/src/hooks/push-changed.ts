@@ -3,7 +3,7 @@ import { join, dirname } from 'node:path';
 import { rename } from 'node:fs/promises';
 import { findProjectRoot, findIssueFiles, isModifiedSince } from './shared.js';
 import { detectRepo, api, fetchAllComments } from '../gh.js';
-import { parseIssueFile, serializeIssue } from '../tools/issue-files.js';
+import { parseIssueFile, serializeIssue, issueFilePath } from '../tools/issue-files.js';
 
 interface PushStats {
   pushed: number;
@@ -175,7 +175,7 @@ async function main() {
       await Bun.write(file.path, serialized);
 
       // Then rename
-      const newPath = join(dirname(file.path), `issue-${created.number}.md`);
+      const newPath = issueFilePath(dirname(file.path), created.number, created.title);
       await rename(file.path, newPath);
 
       stats.created++;

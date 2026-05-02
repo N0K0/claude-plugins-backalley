@@ -2,8 +2,8 @@ import { z } from 'zod';
 import { api, fetchAllComments } from '../gh.js';
 import { repoParams, type ToolDef } from '../types.js';
 import { mkdir, rename } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
-import { serializeIssue, parseIssueFile, issueFilePath, resolveIssuePaths, unifiedDiff } from './issue-files.js';
+import { dirname } from 'node:path';
+import { serializeIssue, parseIssueFile, issueFilePath, ensureSlugPath, resolveIssuePaths, unifiedDiff } from './issue-files.js';
 
 export const tools: ToolDef[] = [
   {
@@ -53,7 +53,7 @@ export const tools: ToolDef[] = [
       const files = [];
       for (const issue of issues) {
         const comments = await fetchAllComments(ctx.owner, ctx.repo, issue.number);
-        const filePath = issueFilePath(args.path, issue.number);
+        const filePath = await ensureSlugPath(args.path, issue.number, issue.title);
         const content = serializeIssue(issue, comments);
         await Bun.write(filePath, content);
         files.push({ path: filePath, number: issue.number, title: issue.title });
@@ -107,7 +107,7 @@ export const tools: ToolDef[] = [
             await Bun.write(filePath, serialized);
 
             // Rename file
-            const newPath = join(dirname(filePath), `issue-${created.number}.md`);
+            const newPath = issueFilePath(dirname(filePath), created.number, created.title);
             await rename(filePath, newPath);
 
             results.push({

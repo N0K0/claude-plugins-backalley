@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'bun:test';
-import { parseIssueFile, serializeIssue, serializeComments, resolveIssuePaths, Comment } from './issue-files';
+import { parseIssueFile, serializeIssue, serializeComments, resolveIssuePaths, slugifyTitle, issueFilePath, ensureSlugPath, Comment } from './issue-files';
 import { mkdir, writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -65,10 +65,11 @@ Body`;
 describe('resolveIssuePaths', () => {
   const tmpDir = join(import.meta.dir, '__test_tmp_resolve');
 
-  test('includes both numbered and new-issue files from directory', async () => {
+  test('includes legacy, slug-form, and new-issue files from directory', async () => {
     await mkdir(tmpDir, { recursive: true });
     await writeFile(join(tmpDir, 'issue-1.md'), '---\ntitle: "One"\n---\n\n');
-    await writeFile(join(tmpDir, 'issue-10.md'), '---\ntitle: "Ten"\n---\n\n');
+    await writeFile(join(tmpDir, 'issue-2-some-title.md'), '---\ntitle: "Two"\n---\n\n');
+    await writeFile(join(tmpDir, 'issue-10-other-thing.md'), '---\ntitle: "Ten"\n---\n\n');
     await writeFile(join(tmpDir, 'issue-new.md'), '---\ntitle: "New"\n---\n\n');
     await writeFile(join(tmpDir, 'issue-new-auth.md'), '---\ntitle: "Auth"\n---\n\n');
     await writeFile(join(tmpDir, 'README.md'), 'ignore me');
@@ -79,7 +80,8 @@ describe('resolveIssuePaths', () => {
     // Numbered files sorted by number, then new-issue files sorted alphabetically
     expect(names).toEqual([
       'issue-1.md',
-      'issue-10.md',
+      'issue-2-some-title.md',
+      'issue-10-other-thing.md',
       'issue-new-auth.md',
       'issue-new.md',
     ]);
@@ -89,10 +91,95 @@ describe('resolveIssuePaths', () => {
 
   test('returns single file path when given a file', async () => {
     await mkdir(tmpDir, { recursive: true });
-    const f = join(tmpDir, 'issue-5.md');
+    const f = join(tmpDir, 'issue-5-my-issue.md');
     await writeFile(f, '---\ntitle: "Five"\n---\n\n');
     const paths = await resolveIssuePaths(f);
     expect(paths).toEqual([f]);
+    await rm(tmpDir, { recursive: true });
+  });
+});
+
+describe('slugifyTitle', () => {
+  test('lowercases and hyphenates words', () => {
+    expect(slugifyTitle('Fix the Login Bug')).toBe('fix-the-login-bug');
+  });
+
+  test('collapses runs of non-alphanumeric characters', () => {
+    expect(slugifyTitle('Add feat: (new API) — fast!')).toBe('add-feat-new-api-fast');
+  });
+
+  test('trims leading and trailing hyphens', () => {
+    expect(slugifyTitle('---hello---')).toBe('hello');
+  });
+
+  test('caps at 50 chars and trims trailing hyphen', () => {
+    const long = 'a'.repeat(48) + '-b';
+    const result = slugifyTitle(long);
+    expect(result.length).toBeLessThanOrEqual(50);
+    expect(result).not.toMatch(/-$/);
+  });
+
+  test('returns empty string for title that has no alphanumeric characters', () => {
+    expect(slugifyTitle('!!!---!!!')).toBe('');
+  });
+
+  test('strips non-ASCII characters', () => {
+    expect(slugifyTitle('Ünïcödé fix')).toBe('n-c-d-fix');
+  });
+});
+
+describe('issueFilePath', () => {
+  test('includes slug when title provided', () => {
+    expect(issueFilePath('/dir', 5, 'My Cool Bug')).toBe('/dir/issue-5-my-cool-bug.md');
+  });
+
+  test('omits slug when no title', () => {
+    expect(issueFilePath('/dir', 5)).toBe('/dir/issue-5.md');
+  });
+
+  test('omits slug when title slugifies to empty', () => {
+    expect(issueFilePath('/dir', 5, '!!!')).toBe('/dir/issue-5.md');
+  });
+});
+
+describe('ensureSlugPath', () => {
+  const tmpDir = join(import.meta.dir, '__test_tmp_slug');
+
+  test('renames legacy issue-{N}.md to slug form', async () => {
+    await mkdir(tmpDir, { recursive: true });
+    const legacy = join(tmpDir, 'issue-7.md');
+    await writeFile(legacy, 'content');
+
+    const result = await ensureSlugPath(tmpDir, 7, 'My Feature');
+    expect(result).toBe(join(tmpDir, 'issue-7-my-feature.md'));
+
+    const { readdir } = await import('node:fs/promises');
+    const entries = await readdir(tmpDir);
+    expect(entries).toContain('issue-7-my-feature.md');
+    expect(entries).not.toContain('issue-7.md');
+
+    await rm(tmpDir, { recursive: true });
+  });
+
+  test('renames stale-slug file when title changes', async () => {
+    await mkdir(tmpDir, { recursive: true });
+    const stale = join(tmpDir, 'issue-3-old-title.md');
+    await writeFile(stale, 'content');
+
+    const result = await ensureSlugPath(tmpDir, 3, 'New Title', stale);
+    expect(result).toBe(join(tmpDir, 'issue-3-new-title.md'));
+
+    await rm(tmpDir, { recursive: true });
+  });
+
+  test('is a no-op when filename already matches', async () => {
+    await mkdir(tmpDir, { recursive: true });
+    const correct = join(tmpDir, 'issue-9-correct.md');
+    await writeFile(correct, 'content');
+
+    const result = await ensureSlugPath(tmpDir, 9, 'correct', correct);
+    expect(result).toBe(correct);
+
     await rm(tmpDir, { recursive: true });
   });
 });

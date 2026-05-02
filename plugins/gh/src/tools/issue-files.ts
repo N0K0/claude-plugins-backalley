@@ -1,4 +1,4 @@
-import { readdir, stat } from 'node:fs/promises';
+import { readdir, rename, stat } from 'node:fs/promises';
 import { join } from 'node:path';
 import { stringify, parse } from 'yaml';
 
@@ -29,9 +29,43 @@ export interface ParsedIssueFile {
   comments: Comment[];
 }
 
+/** Convert a title string to a URL-safe slug (lowercase, hyphen-joined, max 50 chars) */
+export function slugifyTitle(title: string): string {
+  let slug = title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+  if (slug.length > 50) {
+    slug = slug.slice(0, 50).replace(/-+$/, '');
+  }
+  return slug;
+}
+
 /** Build the file path for an issue in a directory */
-export function issueFilePath(dir: string, number: number): string {
-  return join(dir, `issue-${number}.md`);
+export function issueFilePath(dir: string, number: number, title?: string): string {
+  const slug = title ? slugifyTitle(title) : '';
+  return join(dir, slug ? `issue-${number}-${slug}.md` : `issue-${number}.md`);
+}
+
+/**
+ * Ensure the on-disk file for an issue uses the slug-form filename.
+ * If an existing file for the same number has a different name, rename it.
+ * Returns the canonical (slug-form) path.
+ */
+export async function ensureSlugPath(dir: string, number: number, title: string, currentPath?: string): Promise<string> {
+  const desired = issueFilePath(dir, number, title);
+  const existing = currentPath ?? await findExistingIssuePath(dir, number);
+  if (existing && existing !== desired) {
+    await rename(existing, desired);
+  }
+  return desired;
+}
+
+async function findExistingIssuePath(dir: string, number: number): Promise<string | null> {
+  const entries = await readdir(dir);
+  const re = new RegExp(`^issue-${number}(?:-[^/]*)?\.md$`);
+  const match = entries.find(e => re.test(e));
+  return match ? join(dir, match) : null;
 }
 
 /**
@@ -310,10 +344,10 @@ export async function resolveIssuePaths(path: string): Promise<string[]> {
   if (s.isDirectory()) {
     const entries = await readdir(path);
     const numbered = entries
-      .filter(e => /^issue-\d+\.md$/.test(e))
+      .filter(e => /^issue-(\d+)(?:-[^/]*)?\.md$/.test(e))
       .sort((a, b) => {
-        const numA = parseInt(a.match(/issue-(\d+)/)?.[1] ?? '0');
-        const numB = parseInt(b.match(/issue-(\d+)/)?.[1] ?? '0');
+        const numA = parseInt(a.match(/^issue-(\d+)/)?.[1] ?? '0');
+        const numB = parseInt(b.match(/^issue-(\d+)/)?.[1] ?? '0');
         return numA - numB;
       });
     const newIssues = entries

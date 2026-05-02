@@ -35,7 +35,7 @@ Only `title` is required. All other fields are optional.
 
 1. The issue is created on GitHub via the API
 2. The file's frontmatter is updated with the assigned `number`, `url`, and `pulled_at`
-3. The file is renamed from `issue-new*.md` to `issue-{number}.md`
+3. The file is renamed from `issue-new*.md` to `issue-{number}-{title-slug}.md`
 
 ## Notes
 

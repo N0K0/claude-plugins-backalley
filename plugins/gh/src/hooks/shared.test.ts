@@ -20,16 +20,18 @@ describe('findProjectRoot', () => {
 describe('findIssueFiles', () => {
   const tmpDir = join(import.meta.dir, '__test_tmp_hooks');
 
-  test('finds numbered and new-issue files', async () => {
+  test('finds numbered (legacy and slug-form) and new-issue files', async () => {
     await mkdir(tmpDir, { recursive: true });
     await writeFile(join(tmpDir, 'issue-1.md'), 'test');
+    await writeFile(join(tmpDir, 'issue-2-my-feature.md'), 'test');
     await writeFile(join(tmpDir, 'issue-new.md'), 'test');
     await writeFile(join(tmpDir, 'issue-new-bug.md'), 'test');
     await writeFile(join(tmpDir, 'README.md'), 'ignore');
 
     const files = await findIssueFiles(tmpDir);
-    expect(files.numbered.map(f => f.name)).toEqual(['issue-1.md']);
+    expect(files.numbered.map(f => f.name)).toEqual(['issue-1.md', 'issue-2-my-feature.md']);
     expect(files.numbered[0].number).toBe(1);
+    expect(files.numbered[1].number).toBe(2);
     expect(files.newIssues.map(f => f.name).sort()).toEqual(['issue-new-bug.md', 'issue-new.md']);
 
     await rm(tmpDir, { recursive: true });
