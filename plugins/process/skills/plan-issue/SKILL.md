@@ -63,6 +63,29 @@ Do not proceed past the entry gate unless all checks pass.
 
 8. Create native Claude Code tasks via `TaskCreate` for session tracking — one task per checklist item.
 
+8.5. **Write tasks.json** — After all `TaskCreate` calls complete, capture each native task ID from the tool result (`task.id`). Write a tasks persistence file co-located with the spec:
+   - **GH mode:** `.issues/issue-{N}.tasks.json`
+   - **Local mode:** `docs/specs/<slug>.tasks.json`
+
+   Format:
+   ```json
+   {
+     "issueNumber": 42,
+     "specPath": ".issues/issue-42.md",
+     "tasks": [
+       {
+         "index": 0,
+         "subject": "Task 1: Create foo.ts with bar interface",
+         "status": "pending",
+         "nativeId": "<id from TaskCreate result>"
+       }
+     ],
+     "lastUpdated": "<ISO timestamp>"
+   }
+   ```
+
+   Omit `issueNumber` in local mode. `index` is 0-based and matches checklist order — it's the stable cross-session key. `nativeId` is session-scoped and will be refreshed on resume.
+
 9. **Transition status:**
    - **GH mode:** call `issue_update` to remove `backlog` and `has-spec` labels and add `in-progress`.
    - **Local mode:** update the frontmatter `status: has-spec` → `status: in-progress`.
@@ -96,8 +119,8 @@ Tasks should be concrete and file-level — "Create X in Y" or "Modify Z to add 
 **Problem:** Vague checklist items.
 **Fix:** Every item should name specific files and describe a concrete change.
 
-**Problem:** Forgetting native task creation.
-**Fix:** Call `TaskCreate` for each checklist item so progress is visible in the session.
+**Problem:** Forgetting native task creation or tasks.json.
+**Fix:** Call `TaskCreate` for each checklist item, then write tasks.json with the resulting IDs so execute-issue can resume without re-parsing the checklist.
 
 ## Red Flags
 
@@ -113,6 +136,7 @@ Tasks should be concrete and file-level — "Create X in Y" or "Modify Z to add 
 - Name specific files in each task
 - Get user approval on the checklist before persisting
 - Create native tasks for session tracking
+- Write tasks.json with native IDs after all TaskCreate calls complete
 - Link to umbrella if one exists
 - Transition status after persisting
 
