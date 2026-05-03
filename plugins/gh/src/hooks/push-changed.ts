@@ -1,9 +1,8 @@
 import { existsSync } from 'node:fs';
-import { join, dirname } from 'node:path';
-import { rename } from 'node:fs/promises';
+import { join, dirname, basename } from 'node:path';
 import { findProjectRoot, findIssueFiles, isModifiedSince } from './shared.js';
 import { detectRepo, api, fetchAllComments } from '../gh.js';
-import { parseIssueFile, serializeIssue, issueFilePath } from '../tools/issue-files.js';
+import { parseIssueFile, serializeIssue, ensureLocation } from '../tools/issue-files.js';
 
 interface PushStats {
   pushed: number;
@@ -124,10 +123,12 @@ async function main() {
         }
       }
 
-      // Rewrite file with fresh state including comments
+      // Rewrite file with fresh state including comments; move to/from closed/ if state changed
       const freshComments = await fetchAllComments(ctx.owner, ctx.repo, frontmatter.number);
       const refreshed = serializeIssue(updated, freshComments);
-      await Bun.write(file.path, refreshed);
+      const baseDir = basename(dirname(file.path)) === 'closed' ? dirname(dirname(file.path)) : dirname(file.path);
+      const finalPath = await ensureLocation(baseDir, updated.number, updated.title, updated.state, file.path);
+      await Bun.write(finalPath, refreshed);
       stats.pushed++;
     } catch (err: any) {
       stats.skipped.push(`#${file.number} (${err.message})`);
@@ -174,9 +175,7 @@ async function main() {
       const serialized = serializeIssue(created, freshComments);
       await Bun.write(file.path, serialized);
 
-      // Then rename
-      const newPath = issueFilePath(dirname(file.path), created.number, created.title);
-      await rename(file.path, newPath);
+      const newPath = await ensureLocation(dirname(file.path), created.number, created.title, created.state, file.path);
 
       stats.created++;
     } catch (err: any) {

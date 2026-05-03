@@ -1,9 +1,9 @@
 import { z } from 'zod';
 import { api, fetchAllComments } from '../gh.js';
 import { repoParams, type ToolDef } from '../types.js';
-import { mkdir, rename } from 'node:fs/promises';
-import { dirname } from 'node:path';
-import { serializeIssue, parseIssueFile, issueFilePath, ensureSlugPath, resolveIssuePaths, unifiedDiff } from './issue-files.js';
+import { mkdir } from 'node:fs/promises';
+import { dirname, basename } from 'node:path';
+import { serializeIssue, parseIssueFile, ensureLocation, resolveIssuePaths, unifiedDiff } from './issue-files.js';
 
 export const tools: ToolDef[] = [
   {
@@ -53,7 +53,7 @@ export const tools: ToolDef[] = [
       const files = [];
       for (const issue of issues) {
         const comments = await fetchAllComments(ctx.owner, ctx.repo, issue.number);
-        const filePath = await ensureSlugPath(args.path, issue.number, issue.title);
+        const filePath = await ensureLocation(args.path, issue.number, issue.title, issue.state);
         const content = serializeIssue(issue, comments);
         await Bun.write(filePath, content);
         files.push({ path: filePath, number: issue.number, title: issue.title });
@@ -106,9 +106,7 @@ export const tools: ToolDef[] = [
             const serialized = serializeIssue(created, allComments);
             await Bun.write(filePath, serialized);
 
-            // Rename file
-            const newPath = issueFilePath(dirname(filePath), created.number, created.title);
-            await rename(filePath, newPath);
+            const newPath = await ensureLocation(dirname(filePath), created.number, created.title, created.state, filePath);
 
             results.push({
               action: 'created',
@@ -162,17 +160,20 @@ export const tools: ToolDef[] = [
               }
             }
 
-            // Re-fetch and rewrite file with fresh state
+            // Re-fetch and rewrite file with fresh state; move to/from closed/ if state changed
             const freshComments = await fetchAllComments(ctx.owner, ctx.repo, frontmatter.number);
-            await Bun.write(filePath, serializeIssue(result, freshComments));
+            const serialized = serializeIssue(result, freshComments);
+            const baseDir = basename(dirname(filePath)) === 'closed' ? dirname(dirname(filePath)) : dirname(filePath);
+            const finalPath = await ensureLocation(baseDir, result.number, result.title, result.state, filePath);
+            await Bun.write(finalPath, serialized);
 
             const pushResult: any = {
               action: 'updated',
               number: result.number,
               title: result.title,
               html_url: result.html_url,
-              file: filePath.split('/').pop(),
-              path: filePath,
+              file: finalPath.split('/').pop(),
+              path: finalPath,
             };
             if (skipped.length > 0) pushResult.skipped = skipped;
             results.push(pushResult);

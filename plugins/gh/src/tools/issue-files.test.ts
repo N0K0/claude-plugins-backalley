@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'bun:test';
-import { parseIssueFile, serializeIssue, serializeComments, resolveIssuePaths, slugifyTitle, issueFilePath, ensureSlugPath, Comment } from './issue-files';
+import { parseIssueFile, serializeIssue, serializeComments, resolveIssuePaths, slugifyTitle, issueFilePath, ensureLocation, Comment } from './issue-files';
 import { mkdir, writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -97,6 +97,20 @@ describe('resolveIssuePaths', () => {
     expect(paths).toEqual([f]);
     await rm(tmpDir, { recursive: true });
   });
+
+  test('includes issues from closed/ subfolder, sorted by number across both folders', async () => {
+    await mkdir(join(tmpDir, 'closed'), { recursive: true });
+    await writeFile(join(tmpDir, 'issue-1-open.md'), '');
+    await writeFile(join(tmpDir, 'issue-4-open.md'), '');
+    await writeFile(join(tmpDir, 'closed', 'issue-2-done.md'), '');
+    await writeFile(join(tmpDir, 'closed', 'issue-3-fixed.md'), '');
+
+    const paths = await resolveIssuePaths(tmpDir);
+    const names = paths.map(p => p.split('/').pop());
+    expect(names).toEqual(['issue-1-open.md', 'issue-2-done.md', 'issue-3-fixed.md', 'issue-4-open.md']);
+
+    await rm(tmpDir, { recursive: true });
+  });
 });
 
 describe('slugifyTitle', () => {
@@ -142,15 +156,15 @@ describe('issueFilePath', () => {
   });
 });
 
-describe('ensureSlugPath', () => {
+describe('ensureLocation', () => {
   const tmpDir = join(import.meta.dir, '__test_tmp_slug');
 
-  test('renames legacy issue-{N}.md to slug form', async () => {
+  test('renames legacy issue-{N}.md to slug form (open)', async () => {
     await mkdir(tmpDir, { recursive: true });
     const legacy = join(tmpDir, 'issue-7.md');
     await writeFile(legacy, 'content');
 
-    const result = await ensureSlugPath(tmpDir, 7, 'My Feature');
+    const result = await ensureLocation(tmpDir, 7, 'My Feature', 'open');
     expect(result).toBe(join(tmpDir, 'issue-7-my-feature.md'));
 
     const { readdir } = await import('node:fs/promises');
@@ -161,24 +175,83 @@ describe('ensureSlugPath', () => {
     await rm(tmpDir, { recursive: true });
   });
 
-  test('renames stale-slug file when title changes', async () => {
+  test('renames stale-slug file when title changes (open)', async () => {
     await mkdir(tmpDir, { recursive: true });
     const stale = join(tmpDir, 'issue-3-old-title.md');
     await writeFile(stale, 'content');
 
-    const result = await ensureSlugPath(tmpDir, 3, 'New Title', stale);
+    const result = await ensureLocation(tmpDir, 3, 'New Title', 'open', stale);
     expect(result).toBe(join(tmpDir, 'issue-3-new-title.md'));
 
     await rm(tmpDir, { recursive: true });
   });
 
-  test('is a no-op when filename already matches', async () => {
+  test('is a no-op when filename already matches (open)', async () => {
     await mkdir(tmpDir, { recursive: true });
     const correct = join(tmpDir, 'issue-9-correct.md');
     await writeFile(correct, 'content');
 
-    const result = await ensureSlugPath(tmpDir, 9, 'correct', correct);
+    const result = await ensureLocation(tmpDir, 9, 'correct', 'open', correct);
     expect(result).toBe(correct);
+
+    await rm(tmpDir, { recursive: true });
+  });
+
+  test('moves top-level file to closed/ when state is closed', async () => {
+    await mkdir(tmpDir, { recursive: true });
+    const top = join(tmpDir, 'issue-5-fix-bug.md');
+    await writeFile(top, 'content');
+
+    const result = await ensureLocation(tmpDir, 5, 'fix bug', 'closed');
+    expect(result).toBe(join(tmpDir, 'closed', 'issue-5-fix-bug.md'));
+
+    const { readdir } = await import('node:fs/promises');
+    const topEntries = await readdir(tmpDir);
+    expect(topEntries).not.toContain('issue-5-fix-bug.md');
+    const closedEntries = await readdir(join(tmpDir, 'closed'));
+    expect(closedEntries).toContain('issue-5-fix-bug.md');
+
+    await rm(tmpDir, { recursive: true });
+  });
+
+  test('moves file from closed/ back to top level when state is open', async () => {
+    await mkdir(join(tmpDir, 'closed'), { recursive: true });
+    const closedPath = join(tmpDir, 'closed', 'issue-8-reopen-me.md');
+    await writeFile(closedPath, 'content');
+
+    const result = await ensureLocation(tmpDir, 8, 'reopen me', 'open');
+    expect(result).toBe(join(tmpDir, 'issue-8-reopen-me.md'));
+
+    const { readdir } = await import('node:fs/promises');
+    const topEntries = await readdir(tmpDir);
+    expect(topEntries).toContain('issue-8-reopen-me.md');
+    const closedEntries = await readdir(join(tmpDir, 'closed'));
+    expect(closedEntries).not.toContain('issue-8-reopen-me.md');
+
+    await rm(tmpDir, { recursive: true });
+  });
+
+  test('is a no-op when closed file is already at correct closed path', async () => {
+    await mkdir(join(tmpDir, 'closed'), { recursive: true });
+    const closedPath = join(tmpDir, 'closed', 'issue-4-done.md');
+    await writeFile(closedPath, 'content');
+
+    const result = await ensureLocation(tmpDir, 4, 'done', 'closed', closedPath);
+    expect(result).toBe(closedPath);
+
+    await rm(tmpDir, { recursive: true });
+  });
+
+  test('creates closed/ directory when it does not exist and moves file into it', async () => {
+    await mkdir(tmpDir, { recursive: true });
+    await writeFile(join(tmpDir, 'issue-11-new-closed.md'), 'content');
+
+    const result = await ensureLocation(tmpDir, 11, 'new closed', 'closed');
+    expect(result).toBe(join(tmpDir, 'closed', 'issue-11-new-closed.md'));
+
+    const { readdir } = await import('node:fs/promises');
+    const closedEntries = await readdir(join(tmpDir, 'closed'));
+    expect(closedEntries).toContain('issue-11-new-closed.md');
 
     await rm(tmpDir, { recursive: true });
   });

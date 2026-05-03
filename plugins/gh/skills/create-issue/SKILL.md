@@ -36,6 +36,7 @@ Only `title` is required. All other fields are optional.
 1. The issue is created on GitHub via the API
 2. The file's frontmatter is updated with the assigned `number`, `url`, and `pulled_at`
 3. The file is renamed from `issue-new*.md` to `issue-{number}-{title-slug}.md`
+4. If the issue is closed, the file is placed in `.issues/closed/` instead of `.issues/`; reopening the issue moves it back to `.issues/`
 
 ## Notes
 

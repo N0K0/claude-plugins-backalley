@@ -44,6 +44,26 @@ describe('findIssueFiles', () => {
     expect(files.newIssues).toEqual([]);
     await rm(tmpDir, { recursive: true });
   });
+
+  test('includes numbered files from closed/ subdirectory, sorted across both; ignores issue-new* in closed/', async () => {
+    await mkdir(join(tmpDir, 'closed'), { recursive: true });
+    await writeFile(join(tmpDir, 'issue-1-open.md'), 'test');
+    await writeFile(join(tmpDir, 'issue-4-open.md'), 'test');
+    await writeFile(join(tmpDir, 'closed', 'issue-2-done.md'), 'test');
+    await writeFile(join(tmpDir, 'closed', 'issue-3-shipped.md'), 'test');
+    await writeFile(join(tmpDir, 'closed', 'issue-new-bogus.md'), 'test');
+
+    const files = await findIssueFiles(tmpDir);
+    expect(files.numbered.map(f => f.name)).toEqual([
+      'issue-1-open.md',
+      'issue-2-done.md',
+      'issue-3-shipped.md',
+      'issue-4-open.md',
+    ]);
+    expect(files.newIssues.map(f => f.name)).toEqual([]);
+
+    await rm(tmpDir, { recursive: true });
+  });
 });
 
 describe('isModifiedSince', () => {

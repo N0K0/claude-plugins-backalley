@@ -1,4 +1,4 @@
-import { readdir, rename, stat } from 'node:fs/promises';
+import { readdir, rename, stat, mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import { stringify, parse } from 'yaml';
 
@@ -48,24 +48,36 @@ export function issueFilePath(dir: string, number: number, title?: string): stri
 }
 
 /**
- * Ensure the on-disk file for an issue uses the slug-form filename.
- * If an existing file for the same number has a different name, rename it.
- * Returns the canonical (slug-form) path.
+ * Ensure the on-disk file for an issue is in the correct location based on state.
+ * Closed issues go in baseDir/closed/, open issues stay in baseDir.
+ * If the file is in the wrong location or has a stale slug, it is moved/renamed.
+ * Returns the canonical path.
  */
-export async function ensureSlugPath(dir: string, number: number, title: string, currentPath?: string): Promise<string> {
-  const desired = issueFilePath(dir, number, title);
-  const existing = currentPath ?? await findExistingIssuePath(dir, number);
+export async function ensureLocation(baseDir: string, number: number, title: string, state: string, currentPath?: string): Promise<string> {
+  const targetDir = state === 'closed' ? join(baseDir, 'closed') : baseDir;
+  await mkdir(targetDir, { recursive: true });
+  const desired = issueFilePath(targetDir, number, title);
+  const existing = currentPath ?? await findExistingIssuePath(baseDir, number);
   if (existing && existing !== desired) {
     await rename(existing, desired);
   }
   return desired;
 }
 
-async function findExistingIssuePath(dir: string, number: number): Promise<string | null> {
-  const entries = await readdir(dir);
+async function findExistingIssuePath(baseDir: string, number: number): Promise<string | null> {
   const re = new RegExp(`^issue-${number}(?:-[^/]*)?\.md$`);
-  const match = entries.find(e => re.test(e));
-  return match ? join(dir, match) : null;
+  try {
+    const entries = await readdir(baseDir);
+    const match = entries.find(e => re.test(e));
+    if (match) return join(baseDir, match);
+  } catch {}
+  try {
+    const closedDir = join(baseDir, 'closed');
+    const entries = await readdir(closedDir);
+    const match = entries.find(e => re.test(e));
+    if (match) return join(closedDir, match);
+  } catch {}
+  return null;
 }
 
 /**
@@ -343,17 +355,24 @@ export async function resolveIssuePaths(path: string): Promise<string[]> {
   if (s.isFile()) return [path];
   if (s.isDirectory()) {
     const entries = await readdir(path);
-    const numbered = entries
+    const numbered: { path: string; num: number }[] = entries
       .filter(e => /^issue-(\d+)(?:-[^/]*)?\.md$/.test(e))
-      .sort((a, b) => {
-        const numA = parseInt(a.match(/^issue-(\d+)/)?.[1] ?? '0');
-        const numB = parseInt(b.match(/^issue-(\d+)/)?.[1] ?? '0');
-        return numA - numB;
-      });
+      .map(e => ({ path: join(path, e), num: parseInt(e.match(/^issue-(\d+)/)?.[1] ?? '0') }));
+    try {
+      const closedDir = join(path, 'closed');
+      const closedEntries = await readdir(closedDir);
+      for (const e of closedEntries) {
+        if (/^issue-(\d+)(?:-[^/]*)?\.md$/.test(e)) {
+          numbered.push({ path: join(closedDir, e), num: parseInt(e.match(/^issue-(\d+)/)?.[1] ?? '0') });
+        }
+      }
+    } catch {}
+    numbered.sort((a, b) => a.num - b.num);
     const newIssues = entries
       .filter(e => /^issue-new.*\.md$/.test(e))
-      .sort();
-    return [...numbered, ...newIssues].map(e => join(path, e));
+      .sort()
+      .map(e => join(path, e));
+    return [...numbered.map(e => e.path), ...newIssues];
   }
   throw new Error(`Path is neither a file nor directory: ${path}`);
 }

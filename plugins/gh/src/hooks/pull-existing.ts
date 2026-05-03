@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { findProjectRoot, findIssueFiles } from './shared.js';
 import { detectRepo, api, fetchAllComments } from '../gh.js';
-import { serializeIssue, ensureSlugPath } from '../tools/issue-files.js';
+import { serializeIssue, ensureLocation } from '../tools/issue-files.js';
 
 interface PullStats {
   pulled: number;
@@ -64,7 +64,7 @@ async function main() {
       }
       const comments = await fetchAllComments(ctx.owner, ctx.repo, file.number);
       const content = serializeIssue(issue, comments);
-      const filePath = await ensureSlugPath(issuesDir, file.number, issue.title, file.path);
+      const filePath = await ensureLocation(issuesDir, file.number, issue.title, issue.state, file.path);
       await Bun.write(filePath, content);
       stats.pulled++;
     } catch (err: any) {

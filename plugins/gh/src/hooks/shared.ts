@@ -54,6 +54,18 @@ export async function findIssueFiles(dir: string): Promise<IssueFileSet> {
     }
   }
 
+  // Also scan closed/ for numbered files; issue-new*.md files there are intentionally skipped
+  try {
+    const closedDir = join(dir, 'closed');
+    const closedEntries = await readdir(closedDir);
+    for (const name of closedEntries) {
+      const numMatch = name.match(/^issue-(\d+)(?:-[^/]*)?\.md$/);
+      if (numMatch) {
+        numbered.push({ name, path: join(closedDir, name), number: parseInt(numMatch[1]) });
+      }
+    }
+  } catch {}
+
   numbered.sort((a, b) => a.number - b.number);
   newIssues.sort((a, b) => a.name.localeCompare(b.name));
 
