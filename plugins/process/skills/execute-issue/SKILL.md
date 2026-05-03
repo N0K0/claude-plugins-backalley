@@ -23,6 +23,23 @@ Proceed only after all six checks pass.
 
 7. Extract the plan working file: parse `.issues/issue-{N}.md` for the `## Implementation Checklist` section and write just that section (heading + all `- [ ]` / `- [x]` items) to `.issues/issue-{N}.plan.md`. Recreate this file fresh every time the skill is invoked — it is ephemeral and regenerable from the issue body at any time. The issue body is the source of truth.
 
+7.5. **Check tasks.json for resume data.** Look for `.issues/issue-{N}.tasks.json`. If found:
+   - Use the `subject` field from each entry to populate `TaskCreate` calls (step 2), rather than re-parsing the raw checklist text.
+   - Skip entries whose `status` is `"completed"` — those are done.
+   - After re-creating tasks with `TaskCreate`, write back to `.issues/issue-{N}.tasks.json` with the fresh `nativeId` values (previous session IDs are stale; replace them). Preserve `index`, `subject`, and `status`.
+
+   If `.issues/issue-{N}.tasks.json` does not exist, proceed with normal checklist parsing (step 2), then write the file after all `TaskCreate` calls complete:
+   ```json
+   {
+     "issueNumber": N,
+     "specPath": ".issues/issue-{N}.md",
+     "tasks": [
+       { "index": 0, "subject": "...", "status": "pending", "nativeId": "<id>" }
+     ],
+     "lastUpdated": "<ISO timestamp>"
+   }
+   ```
+
 ## Execution Mode
 
 After parsing the checklist, use `AskUserQuestion` to present the execution mode choice. Put the recommended option first with "(Recommended)" in its label:
@@ -63,6 +80,7 @@ For each unchecked item in order:
 2. Follow `process:tdd` — write failing test first, then implement.
 3. Commit the changes with a descriptive message referencing the checklist item.
 4. Mark the native task as `completed`.
+4.5. Update `.issues/issue-{N}.tasks.json`: find the entry by `index` (checklist position, 0-based), set `status: "completed"`, update `lastUpdated` to the current ISO timestamp, write back.
 5. Change `- [ ]` to `- [x]` for this item in both `.issues/issue-{N}.plan.md` and `.issues/issue-{N}.md` (under `## Implementation Checklist`).
 6. Call `issue_push` with the `.issues/` directory to sync all issues to GitHub.
 
@@ -113,8 +131,9 @@ Dispatch a spec compliance reviewer using `spec-reviewer-prompt.md`. This verifi
 ### Step 5: Complete Item
 
 1. Mark the native task as `completed`.
-2. Change `- [ ]` to `- [x]` for this item in both `.issues/issue-{N}.plan.md` and `.issues/issue-{N}.md` (under `## Implementation Checklist`).
-3. Call `issue_push` with the `.issues/` directory to sync all issues to GitHub.
+2. Update `.issues/issue-{N}.tasks.json`: find the entry by `index` (checklist position, 0-based), set `status: "completed"`, update `lastUpdated`, write back.
+3. Change `- [ ]` to `- [x]` for this item in both `.issues/issue-{N}.plan.md` and `.issues/issue-{N}.md` (under `## Implementation Checklist`).
+4. Call `issue_push` with the `.issues/` directory to sync all issues to GitHub.
 
 Then proceed to the next unchecked item.
 
@@ -227,7 +246,7 @@ If a previous session was interrupted mid-checklist:
 - Re-create native tasks only for the remaining unchecked items — don't create tasks for already-completed work.
 - Re-derive `.issues/issue-{N}.plan.md` from the freshly pulled issue body (entry gate step 7) so the plan working file reflects current checked/unchecked state.
 
-This is the crash-recovery model: GitHub is the persistent state. What's checked is done; what's unchecked is pending.
+This is the crash-recovery model: GitHub is the persistent state (what's checked is done; what's unchecked is pending). `.issues/issue-{N}.tasks.json` provides task subjects and prior statuses for fast `TaskCreate` re-population — use it when available (step 7.5), fall back to checklist parsing when absent.
 
 ## Pitfalls
 
