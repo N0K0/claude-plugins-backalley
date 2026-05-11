@@ -3,12 +3,13 @@ import { api, fetchAllComments } from '../gh.js';
 import { repoParams, type ToolDef } from '../types.js';
 import { mkdir } from 'node:fs/promises';
 import { dirname, basename } from 'node:path';
-import { serializeIssue, parseIssueFile, ensureLocation, resolveIssuePaths, unifiedDiff } from './issue-files.js';
+import { serializeIssue, parseIssueFile, ensureLocation, resolveIssuePaths, unifiedDiff, findExistingIssuePath } from './issue-files.js';
+import { stat } from 'node:fs/promises';
 
 export const tools: ToolDef[] = [
   {
     name: 'issue_pull',
-    description: 'Pull GitHub issues to local markdown files with YAML frontmatter and comments',
+    description: 'Pull GitHub issues to local markdown files with YAML frontmatter and comments. In folder mode, skips issues whose local pulled_at is at or after the remote updated_at (set force: true to bypass).',
     inputSchema: z.object({
       ...repoParams,
       issue_number: z.number().optional().describe('Pull a single issue'),
@@ -17,11 +18,13 @@ export const tools: ToolDef[] = [
       milestone: z.string().optional().describe('Milestone number, "*", or "none"'),
       assignee: z.string().optional().describe('Username or "none"'),
       path: z.string().describe('Absolute path to output directory'),
+      force: z.boolean().optional().default(false).describe('Re-fetch and rewrite every issue, ignoring the pulled_at timestamp'),
     }),
     handler: async (args, ctx) => {
       await mkdir(args.path, { recursive: true });
 
       let issues: any[];
+      const isFolderMode = args.issue_number === undefined;
 
       if (args.issue_number) {
         const issue = await api(`/repos/${ctx.owner}/${ctx.repo}/issues/${args.issue_number}`);
@@ -52,11 +55,31 @@ export const tools: ToolDef[] = [
 
       const files = [];
       for (const issue of issues) {
+        // Folder-mode skip: if a local file exists and its pulled_at is at or after remote updated_at,
+        // skip the per-issue comment fetch and file rewrite. Single-issue mode always refetches.
+        if (isFolderMode && !args.force) {
+          const existingPath = await findExistingIssuePath(args.path, issue.number);
+          if (existingPath) {
+            try {
+              const existing = await Bun.file(existingPath).text();
+              const { frontmatter } = parseIssueFile(existing);
+              const localTs = frontmatter.pulled_at ? Date.parse(frontmatter.pulled_at) : NaN;
+              const remoteTs = Date.parse(issue.updated_at);
+              if (Number.isFinite(localTs) && Number.isFinite(remoteTs) && localTs >= remoteTs) {
+                files.push({ path: existingPath, number: issue.number, title: issue.title, action: 'unchanged' });
+                continue;
+              }
+            } catch {
+              // Corrupt local file — fall through and refetch
+            }
+          }
+        }
+
         const comments = await fetchAllComments(ctx.owner, ctx.repo, issue.number);
         const filePath = await ensureLocation(args.path, issue.number, issue.title, issue.state);
         const content = serializeIssue(issue, comments);
         await Bun.write(filePath, content);
-        files.push({ path: filePath, number: issue.number, title: issue.title });
+        files.push({ path: filePath, number: issue.number, title: issue.title, action: 'fetched' });
       }
 
       return { path: args.path, files };
@@ -64,13 +87,14 @@ export const tools: ToolDef[] = [
   },
   {
     name: 'issue_push',
-    description: 'Push local markdown issue files back to GitHub, syncing metadata, body, and comments. Returns results with action, number, title, html_url, file (basename), and path (absolute). For new issues, the file is renamed from issue-new*.md to issue-{number}.md and the new path is returned.',
+    description: 'Push local markdown issue files back to GitHub, syncing metadata, body, and comments. Returns results with action, number, title, html_url, file (basename), and path (absolute). For new issues, the file is renamed from issue-new*.md to issue-{number}.md and the new path is returned. In folder mode, files whose mtime is at or before their pulled_at are skipped as unchanged (set force: true to bypass). Single-file input always pushes.',
     inputSchema: z.object({
       ...repoParams,
       path: z.string().describe('Path to a markdown file or directory of issue files'),
+      force: z.boolean().optional().default(false).describe('Push every file in folder mode regardless of mtime/pulled_at'),
     }),
     handler: async (args, ctx) => {
-      const paths = await resolveIssuePaths(args.path);
+      const { paths, fromDirectory } = await resolveIssuePaths(args.path);
       const results: any[] = [];
       const errors: any[] = [];
 
@@ -78,6 +102,24 @@ export const tools: ToolDef[] = [
         try {
           const content = await Bun.file(filePath).text();
           const { frontmatter, body, comments } = parseIssueFile(content);
+
+          // Folder-mode skip: if mtime is at or before pulled_at + 1s slack and the issue
+          // already exists on GitHub (number is defined), skip the API calls entirely.
+          // Single-file input always proceeds; force: true bypasses.
+          if (fromDirectory && !args.force && frontmatter.number !== undefined && frontmatter.pulled_at) {
+            const mtimeMs = (await stat(filePath)).mtimeMs;
+            const pulledMs = Date.parse(frontmatter.pulled_at);
+            if (Number.isFinite(pulledMs) && mtimeMs <= pulledMs + 1000) {
+              results.push({
+                action: 'unchanged',
+                number: frontmatter.number,
+                title: frontmatter.title,
+                file: filePath.split('/').pop(),
+                path: filePath,
+              });
+              continue;
+            }
+          }
 
           if (frontmatter.number === undefined) {
             // Create new issue
@@ -197,7 +239,7 @@ export const tools: ToolDef[] = [
       path: z.string().describe('Path to a markdown file or directory of issue files'),
     }),
     handler: async (args, ctx) => {
-      const paths = await resolveIssuePaths(args.path);
+      const { paths } = await resolveIssuePaths(args.path);
       const diffs: any[] = [];
       const errors: any[] = [];
 

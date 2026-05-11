@@ -64,7 +64,7 @@ export async function ensureLocation(baseDir: string, number: number, title: str
   return desired;
 }
 
-async function findExistingIssuePath(baseDir: string, number: number): Promise<string | null> {
+export async function findExistingIssuePath(baseDir: string, number: number): Promise<string | null> {
   const re = new RegExp(`^issue-${number}(?:-[^/]*)?\.md$`);
   try {
     const entries = await readdir(baseDir);
@@ -347,12 +347,12 @@ export function unifiedDiff(
 
 /**
  * Resolve a path (file or directory) into a list of issue markdown file paths.
- * If path is a file, returns [path].
- * If path is a directory, returns all issue-*.md files in it.
+ * If path is a file, returns { paths: [path], fromDirectory: false }.
+ * If path is a directory, returns all issue-*.md files in it with fromDirectory: true.
  */
-export async function resolveIssuePaths(path: string): Promise<string[]> {
+export async function resolveIssuePaths(path: string): Promise<{ paths: string[]; fromDirectory: boolean }> {
   const s = await stat(path);
-  if (s.isFile()) return [path];
+  if (s.isFile()) return { paths: [path], fromDirectory: false };
   if (s.isDirectory()) {
     const entries = await readdir(path);
     const numbered: { path: string; num: number }[] = entries
@@ -372,7 +372,7 @@ export async function resolveIssuePaths(path: string): Promise<string[]> {
       .filter(e => /^issue-new.*\.md$/.test(e))
       .sort()
       .map(e => join(path, e));
-    return [...numbered.map(e => e.path), ...newIssues];
+    return { paths: [...numbered.map(e => e.path), ...newIssues], fromDirectory: true };
   }
   throw new Error(`Path is neither a file nor directory: ${path}`);
 }

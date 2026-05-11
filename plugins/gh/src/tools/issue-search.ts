@@ -27,7 +27,7 @@ export async function searchIssues(
   assignees: string[];
   url?: string;
 }>> {
-  const paths = await resolveIssuePaths(dir);
+  const { paths } = await resolveIssuePaths(dir);
   const results: any[] = [];
 
   const stateFilter = filters.state ?? 'open';
