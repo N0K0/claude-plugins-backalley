@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'bun:test';
-import { parseIssueFile, serializeIssue, serializeComments, resolveIssuePaths, slugifyTitle, issueFilePath, ensureLocation, Comment } from './issue-files';
+import { parseIssueFile, serializeIssue, serializeComments, resolveIssuePaths, slugifyTitle, issueFilePath, ensureLocation, findExistingIssuePath, Comment } from './issue-files';
 import { mkdir, writeFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -74,7 +74,7 @@ describe('resolveIssuePaths', () => {
     await writeFile(join(tmpDir, 'issue-new-auth.md'), '---\ntitle: "Auth"\n---\n\n');
     await writeFile(join(tmpDir, 'README.md'), 'ignore me');
 
-    const paths = await resolveIssuePaths(tmpDir);
+    const { paths, fromDirectory } = await resolveIssuePaths(tmpDir);
     const names = paths.map(p => p.split('/').pop());
 
     // Numbered files sorted by number, then new-issue files sorted alphabetically
@@ -85,16 +85,18 @@ describe('resolveIssuePaths', () => {
       'issue-new-auth.md',
       'issue-new.md',
     ]);
+    expect(fromDirectory).toBe(true);
 
     await rm(tmpDir, { recursive: true });
   });
 
-  test('returns single file path when given a file', async () => {
+  test('returns single file path when given a file, fromDirectory false', async () => {
     await mkdir(tmpDir, { recursive: true });
     const f = join(tmpDir, 'issue-5-my-issue.md');
     await writeFile(f, '---\ntitle: "Five"\n---\n\n');
-    const paths = await resolveIssuePaths(f);
+    const { paths, fromDirectory } = await resolveIssuePaths(f);
     expect(paths).toEqual([f]);
+    expect(fromDirectory).toBe(false);
     await rm(tmpDir, { recursive: true });
   });
 
@@ -105,10 +107,38 @@ describe('resolveIssuePaths', () => {
     await writeFile(join(tmpDir, 'closed', 'issue-2-done.md'), '');
     await writeFile(join(tmpDir, 'closed', 'issue-3-fixed.md'), '');
 
-    const paths = await resolveIssuePaths(tmpDir);
+    const { paths, fromDirectory } = await resolveIssuePaths(tmpDir);
     const names = paths.map(p => p.split('/').pop());
     expect(names).toEqual(['issue-1-open.md', 'issue-2-done.md', 'issue-3-fixed.md', 'issue-4-open.md']);
+    expect(fromDirectory).toBe(true);
 
+    await rm(tmpDir, { recursive: true });
+  });
+});
+
+describe('findExistingIssuePath', () => {
+  const tmpDir = join(import.meta.dir, '__test_tmp_findpath');
+
+  test('finds open issue at top level by number', async () => {
+    await mkdir(tmpDir, { recursive: true });
+    await writeFile(join(tmpDir, 'issue-7-some-title.md'), '');
+    const result = await findExistingIssuePath(tmpDir, 7);
+    expect(result).toBe(join(tmpDir, 'issue-7-some-title.md'));
+    await rm(tmpDir, { recursive: true });
+  });
+
+  test('finds closed issue in closed/ subdir by number', async () => {
+    await mkdir(join(tmpDir, 'closed'), { recursive: true });
+    await writeFile(join(tmpDir, 'closed', 'issue-9-done.md'), '');
+    const result = await findExistingIssuePath(tmpDir, 9);
+    expect(result).toBe(join(tmpDir, 'closed', 'issue-9-done.md'));
+    await rm(tmpDir, { recursive: true });
+  });
+
+  test('returns null when issue does not exist', async () => {
+    await mkdir(tmpDir, { recursive: true });
+    const result = await findExistingIssuePath(tmpDir, 999);
+    expect(result).toBeNull();
     await rm(tmpDir, { recursive: true });
   });
 });
