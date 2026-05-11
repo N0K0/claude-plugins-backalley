@@ -38,6 +38,17 @@ Supporting skills used by the workflow (and directly invocable):
 - **parallel-agents** — dispatch independent tasks to parallel subagents with shared-state safety checks.
   Trigger: "research these three things in parallel" → fans out one subagent per task.
 
+General-purpose skills (ported from superpowers, not bound to the issue workflow):
+
+- **worktree** — create an isolated git worktree with directory-priority selection and gitignore safety verification.
+  Trigger: "set up a worktree for this feature" → picks `.worktrees/` (verifies ignored), runs project setup, confirms clean test baseline.
+- **subagents** — execute an implementation plan by dispatching a fresh implementer subagent per task with two-stage review (spec compliance, then code quality).
+  Trigger: "dispatch implementation as subagents" → handles status reporting, model selection, and review loops.
+- **request-review** — dispatch the `code-reviewer` agent with precisely crafted context (git SHAs, plan reference, description) instead of session history.
+  Trigger: "request a code review on this work" → fills the `code-reviewer.md` template.
+- **write-skill** — author and verify new skills using TDD-for-documentation (pressure scenarios, rationalization tables).
+  Trigger: "I want to write a new skill" → walks through RED/GREEN/REFACTOR for skill text.
+
 ### Agents
 
 - **code-reviewer** — independent reviewer used by `finish-issue` and `execute-issue` to check completed work against the spec and coding standards.
