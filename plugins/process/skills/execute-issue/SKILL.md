@@ -262,12 +262,18 @@ This is the crash-recovery model: GitHub is the persistent state (what's checked
 - Ticking items out of order — later tasks often assume earlier ones are complete; reorder only with explicit user approval
 - Skipping checklist items, even if they seem redundant or simple
 - Ignoring implementer escalations (BLOCKED/NEEDS_CONTEXT)
+- Calling `AskUserQuestion` without first emitting the question statement as prose (Rule 1)
+- Offering only two `options` when three or four meaningful choices exist (Rule 2)
+- Letting a choice `description` exceed two sentences (Rule 3)
 
 **Prefer:**
 - Committing changes after each item before syncing
 - Following TDD when implementing (use `process:tdd`)
 - Running final quality review (tests, lint, subagent code review) before handing off to review
 - Resuming from the first unchecked item when continuing interrupted work
+- Emitting the question as prose immediately before each `AskUserQuestion` call (Rule 1)
+- Aiming for four meaningful `options` with the recommended choice first and marked `"(Recommended)"` (Rule 2)
+- Keeping each option's `description` to two sentences or fewer (Rule 3)
 
 ## Integration
 
