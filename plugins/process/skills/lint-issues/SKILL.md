@@ -8,6 +8,8 @@ description: "Audit open GitHub issues for workflow consistency — checks label
 
 **Core principle:** Report problems clearly. Don't fix anything — the user decides what to act on.
 
+> **Built-in plan sync:** this skill is exempt — it does not modify issue checklists. See [`../_shared/builtin-plan-sync.md`](../_shared/builtin-plan-sync.md).
+
 ## Entry Gate
 
 1. Call `detect_repo` to set repo context. If the tool is not available, stop with: "The gh plugin is required. Install it from the backalley marketplace."
