@@ -6,6 +6,8 @@ description: "Brainstorm requirements, propose approaches, and write a spec to a
 
 **Core principle:** One spec, one source of truth. The GitHub Issue body if we're using the issues workflow; otherwise a local markdown file at `docs/specs/<slug>.md`.
 
+> **Built-in plan sync:** this skill is exempt — it does not modify issue checklists. See [`../_shared/builtin-plan-sync.md`](../_shared/builtin-plan-sync.md).
+
 ## Entry Gate
 
 Before doing any work, detect the **mode** (GH issues vs local markdown), then run the mode-specific gate.

@@ -4,6 +4,8 @@ description: "Guides technical evaluation of code review feedback before impleme
 ---
 # Code Review Reception
 
+> **Built-in plan sync:** this skill is exempt — it does not modify issue checklists. See [`../_shared/builtin-plan-sync.md`](../_shared/builtin-plan-sync.md).
+
 ## Overview
 
 Evaluate code review feedback on technical merit and verify against the codebase before implementing.

@@ -8,6 +8,8 @@ Dispatch the `process:code-reviewer` subagent to catch issues before they cascad
 
 **Core principle:** Review early, review often.
 
+> **Built-in plan sync:** this skill is exempt — it does not modify issue checklists. See [`../_shared/builtin-plan-sync.md`](../_shared/builtin-plan-sync.md).
+
 ## When to Request Review
 
 **Mandatory:**

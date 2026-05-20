@@ -8,6 +8,10 @@ description: "Use when an issue's checklist is fully complete — verifies tests
 
 **Core principle:** When the PR is merged via GitHub, `Closes #N` handles closure server-side. When the branch is merged locally and pushed, this skill closes the issue by setting `state: closed` in the local frontmatter and pushing it.
 
+## Built-in plan sync
+
+Before any PR work, close out the built-in task list for this issue per the **Closeout** rules in [`../_shared/builtin-plan-sync.md`](../_shared/builtin-plan-sync.md): call `TaskList`, mark every `pending`/`in_progress` task whose subject starts with `#{N}: ` as `completed`, leave `cancelled` tasks alone, and update `.issues/issue-{N}.tasks.json` to match. The issue checklist is the final authority — if every item is `- [x]`, every owned task must end the run as `completed`.
+
 ## Entry Gate
 
 Before doing any work, run these checks in order:
@@ -27,7 +31,9 @@ Do not proceed past the entry gate unless all six checks pass.
 
 2. **Verify tests** — already confirmed passing in the entry gate.
 
-3. **Present the user with three options:**
+3. **Close out the built-in plan.** Call `TaskList`. For each task whose subject begins with `#{N}: ` and whose status is `pending` or `in_progress`, call `TaskUpdate` with `status: "completed"`. Skip tasks with `status: "cancelled"` — they are intentional orphans from the reconciliation procedure. Update `.issues/issue-{N}.tasks.json` so every entry's `status` matches the native task state, and refresh `lastUpdated`. This must happen before any PR creation work.
+
+4. **Present the user with three options:**
 
    - **Merge via PR (recommended)** — create a PR with `Closes #N` in the body, then squash merge. GitHub closes the issue automatically.
    - **Keep PR open** — create a PR but leave it for external review.
@@ -35,7 +41,7 @@ Do not proceed past the entry gate unless all six checks pass.
 
    Wait for the user's explicit choice before proceeding.
 
-4. **If user chooses merge via PR:**
+5. **If user chooses merge via PR:**
    - Call `pr_create`:
      - Title: the issue title
      - Body: `Closes #{number}` followed by a summary section listing the checklist items as bullet points
@@ -59,13 +65,13 @@ Do not proceed past the entry gate unless all six checks pass.
    - Delete the local branch: `git branch -D issue-{number}` from the main worktree — **never run `git checkout`**.
    - Confirm: "PR merged, issue #{N} closed, worktree cleaned up."
 
-5. **If user chooses keep PR open:**
+6. **If user chooses keep PR open:**
    - Call `pr_create` (same body as above with `Closes #{number}`).
    - Tell the user the PR URL.
    - Do not clean up the worktree — the user may still need it.
    - Confirm: "PR is open at {url}. Merge manually when ready. The worktree at `../worktree-issue-{number}` is still available."
 
-6. **If user chooses merge locally:**
+7. **If user chooses merge locally:**
    - Confirm with the user that the merge + push to `main` has actually happened. If not, stop and ask them to merge and push first, then come back.
    - Edit `.issues/issue-{N}.md` frontmatter: set `state: closed`. Leave all other fields untouched.
    - Run the **Umbrella Checkoff sub-procedure** (see below).
