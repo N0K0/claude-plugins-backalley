@@ -115,7 +115,7 @@ After the spec is written and reviewed (step 8), but before persisting (step 10)
 
 1. Review the Q&A history for deferred decisions. Collect each one: what was chosen, what was deferred, and the trigger condition for revisiting.
 
-2. If any deferred decisions were found, present them to the user as prose first (Rule 1), then call `AskUserQuestion` (`multiSelect: true`) so the user can pick which follow-ups to create. Strive for up to four meaningful options — typically "Create all (Recommended)" plus one option per deferred decision. Keep each option's `description` to two sentences or fewer (Rules 2 and 3).
+2. If any deferred decisions were found, present them to the user as prose first (Rule 1), then call `AskUserQuestion` (`multiSelect: true`) so the user can pick which follow-ups to create. Strive for up to four meaningful options — typically a "Create all" option plus one option per deferred decision (Rule 2). Because this is a multi-select question, **omit `"(Recommended)"`** from the labels per the multi-select edge case in this issue's spec. Keep each option's `description` to two sentences or fewer (Rule 3).
 
 3. For each approved follow-up, create:
    - **GH mode:** an issue file at `.issues/issue-new-{slug}.md` with `needs-spec` label, a brief context body, and `Parent: #N`. Pushed alongside the spec in step 10.
