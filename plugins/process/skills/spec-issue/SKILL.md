@@ -44,7 +44,12 @@ Do not proceed past the entry gate unless all checks pass.
 
 1. Read any existing context (issue body or local file body) for prior requirements or discussion. Use this as input — don't re-ask things already answered.
 
-2. Ask clarifying questions one at a time using the `AskUserQuestion` tool. Prefer multiple choice when possible. Put the recommended answer first and mark it with "(Recommended)" in its label. Wait for an answer before asking the next question. Focus on:
+2. Ask clarifying questions one at a time using the `AskUserQuestion` tool. Follow these three conventions whenever calling the tool (see `AskUserQuestion Conventions` below for the full rules):
+   - **Prose framing first.** Output the question statement as user-facing prose immediately before the tool call, so the user sees the question in narrative flow before the UI prompt appears.
+   - **Aim for four meaningful choices, one recommended.** Provide up to four distinct `options` (the tool's maximum). Put the recommended choice first with `"(Recommended)"` appended to its `label`. Use fewer than four only when additional options would be invented filler.
+   - **Cap each `description` at two sentences.** Edit longer descriptions down rather than letting them sprawl.
+
+   Wait for an answer before asking the next question. Focus on:
    - Purpose: what problem does this solve?
    - Constraints: what must it work with or within?
    - Success criteria: how do we know it's done?
