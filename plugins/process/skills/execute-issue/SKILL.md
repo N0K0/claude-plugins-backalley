@@ -42,14 +42,19 @@ Proceed only after all six checks pass.
 
 ## Execution Mode
 
-After parsing the checklist, use `AskUserQuestion` to present the execution mode choice. Put the recommended option first with "(Recommended)" in its label:
+After parsing the checklist, present the execution-mode question to the user. Follow these `AskUserQuestion` conventions (also enforced in the Pitfalls section below):
 
-- For checklists with 3+ items, recommend subagent-driven
-- For 1-2 items, recommend direct execution
+- **Rule 1 — Prose framing first.** Emit the question (e.g., "How should I work through these N tasks?") as prose immediately before the tool call.
+- **Rule 2 — Aim for four meaningful choices.** Up to three meaningful execution modes exist for this question (Direct, Subagent-driven, Parallel Subagents); a fourth option would be invented filler, so three is correct here. Recommend the right one for the checklist size and mark it `"(Recommended)"`:
+  - 1–2 items → recommend Direct.
+  - 3+ items with all-sequential dependencies → recommend Subagent-driven.
+  - 3+ items with ≥2 file-independent tasks → recommend Parallel Subagents (only offer this option when the prerequisites in `Parallel Subagents with Worktree Isolation` below are met).
+- **Rule 3 — Cap descriptions at two sentences.**
 
-Options:
-1. Direct execution — I work through each item myself
-2. Subagent-driven — fresh subagent per task, with two-stage review
+Options (in the order they should appear when all three are offered):
+1. **Direct execution** — I work through each item myself in this session.
+2. **Subagent-driven** — fresh subagent per task with two-stage review (spec compliance, then code quality).
+3. **Parallel subagents** — independent tasks dispatched in isolated worktrees, merged back sequentially. Only offered when at least two tasks touch non-overlapping files.
 
 **If the user doesn't have a preference or says "just go":** default to direct execution for small checklists (1-2 items) and subagent-driven for larger ones.
 
@@ -257,12 +262,18 @@ This is the crash-recovery model: GitHub is the persistent state (what's checked
 - Ticking items out of order — later tasks often assume earlier ones are complete; reorder only with explicit user approval
 - Skipping checklist items, even if they seem redundant or simple
 - Ignoring implementer escalations (BLOCKED/NEEDS_CONTEXT)
+- Calling `AskUserQuestion` without first emitting the question statement as prose (Rule 1)
+- Offering only two `options` when three or four meaningful choices exist (Rule 2)
+- Letting a choice `description` exceed two sentences (Rule 3)
 
 **Prefer:**
 - Committing changes after each item before syncing
 - Following TDD when implementing (use `process:tdd`)
 - Running final quality review (tests, lint, subagent code review) before handing off to review
 - Resuming from the first unchecked item when continuing interrupted work
+- Emitting the question as prose immediately before each `AskUserQuestion` call (Rule 1)
+- Aiming for four meaningful `options` with the recommended choice first and marked `"(Recommended)"` (Rule 2)
+- Keeping each option's `description` to two sentences or fewer (Rule 3)
 
 ## Integration
 
