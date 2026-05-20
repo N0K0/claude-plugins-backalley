@@ -8,6 +8,10 @@ description: "Implements an issue's checklist by creating a worktree, working th
 
 **Core principle:** Sync to GitHub after every completed checklist item. If the session crashes, progress is preserved.
 
+## Built-in plan sync
+
+This skill owns the mapping between the markdown checklist and the built-in Claude Code task list. Follow the rules in [`../_shared/builtin-plan-sync.md`](../_shared/builtin-plan-sync.md) for initial population, per-item lifecycle (TaskUpdate-then-checkbox ordering, retry-once-then-stop on failure), resume reconciliation (normalization, cancelled orphans, nested-flatten), and the `tasks.json` schema. The steps below reference those rules — do not re-derive them.
+
 ## Entry Gate
 
 Before doing any work, run these checks in order:
@@ -16,29 +20,14 @@ Before doing any work, run these checks in order:
 2. Call `issue_pull` with the `.issues/` directory path to sync all issues locally.
 3. Read the issue file (`.issues/issue-{N}.md`) and check its labels.
 4. If the `in-progress` label is NOT present, stop with: "Issue #{N} doesn't have the `in-progress` label. [If needs-spec: Run spec-issue first. If has-spec: Run plan-issue first.]"
-5. Parse the issue body for checklist items (`- [ ]` and `- [x]`). If there are no checklist items, stop with: "Issue #{N} has no checklist. Run plan-issue to create one."
+5. Parse the issue body for checklist items (`- [ ]` and `- [x]`). If there are no checklist items, do NOT call `TaskCreate`. Stop with: "Issue #{N} has no checklist — run `process:plan-issue` first."
 6. If ALL items are already checked (`- [x]`), stop with: "All checklist items are complete. Run finish-issue to create a PR."
 
 Proceed only after all six checks pass.
 
 7. Extract the plan working file: parse `.issues/issue-{N}.md` for the `## Implementation Checklist` section and write just that section (heading + all `- [ ]` / `- [x]` items) to `.issues/issue-{N}.plan.md`. Recreate this file fresh every time the skill is invoked — it is ephemeral and regenerable from the issue body at any time. The issue body is the source of truth.
 
-7.5. **Check tasks.json for resume data.** Look for `.issues/issue-{N}.tasks.json`. If found:
-   - Use the `subject` field from each entry to populate `TaskCreate` calls (step 2), rather than re-parsing the raw checklist text.
-   - Skip entries whose `status` is `"completed"` — those are done.
-   - After re-creating tasks with `TaskCreate`, write back to `.issues/issue-{N}.tasks.json` with the fresh `nativeId` values (previous session IDs are stale; replace them). Preserve `index`, `subject`, and `status`.
-
-   If `.issues/issue-{N}.tasks.json` does not exist, proceed with normal checklist parsing (step 2), then write the file after all `TaskCreate` calls complete:
-   ```json
-   {
-     "issueNumber": N,
-     "specPath": ".issues/issue-{N}.md",
-     "tasks": [
-       { "index": 0, "subject": "...", "status": "pending", "nativeId": "<id>" }
-     ],
-     "lastUpdated": "<ISO timestamp>"
-   }
-   ```
+7.5. **Reconcile the built-in task list.** Follow the resume reconciliation rules in [`../_shared/builtin-plan-sync.md`](../_shared/builtin-plan-sync.md): call `TaskList`, apply the normalization rule (strip `#{N}: ` prefix, trim, case-sensitive exact match), create missing tasks with the `#{N}: ` prefix, mark already-ticked items `completed`, mark orphaned tasks `cancelled`. The `tasks.json` schema is documented in the same reference. Refresh `nativeId` on every resume; previous session IDs are stale.
 
 ## Execution Mode
 
@@ -57,7 +46,7 @@ Options:
 
 1. Parse the checklist: identify unchecked (`- [ ]`) items as remaining work. Note which items are already checked (`- [x]`) — those are done.
 
-2. Create native Claude Code tasks via `TaskCreate` — **one task per checklist item, not per subtask**. Each checklist item is a phase; the implementer's internal steps (file edits, test runs, etc.) are not separate tasks. The only exception is when a subtask is something the harness can run as a script (e.g. a single Bash command that fully completes the work) — then it's fine to track that script invocation as its own task.
+2. Create native Claude Code tasks via `TaskCreate` — **one task per derived checklist item, not per subtask**. Apply the **nested-flatten rule** from [`../_shared/builtin-plan-sync.md`](../_shared/builtin-plan-sync.md): top-level items become tasks with subject `#{N}: {item text}`; level-2 items become tasks with subject `#{N}: {parent text} > {child text}`; level-3 and deeper items are **dropped** (their progress is implicit when the level-2 parent is marked complete). Each checklist item is a phase; the implementer's internal steps (file edits, test runs, etc.) are not separate tasks. The only exception is when a subtask is something the harness can run as a script (e.g. a single Bash command that fully completes the work) — then it's fine to track that script invocation as its own task.
 
 3. Set up the worktree:
    - Run `git worktree list` to check if a worktree already exists at `../worktree-issue-{number}`.
@@ -76,12 +65,12 @@ Options:
 
 For each unchecked item in order:
 
-1. Mark the corresponding native task as `in_progress`.
+1. Call `TaskUpdate` with `status: "in_progress"` for the corresponding native task. If the call fails, retry once; if it still fails, stop and surface the error — do not proceed to step 2.
 2. Follow `process:tdd` — write failing test first, then implement.
 3. Commit the changes with a descriptive message referencing the checklist item.
-4. Mark the native task as `completed`.
-4.5. Update `.issues/issue-{N}.tasks.json`: find the entry by `index` (checklist position, 0-based), set `status: "completed"`, update `lastUpdated` to the current ISO timestamp, write back.
-5. Change `- [ ]` to `- [x]` for this item in both `.issues/issue-{N}.plan.md` and `.issues/issue-{N}.md` (under `## Implementation Checklist`).
+4. **Mark the native task `completed` BEFORE editing the markdown.** Call `TaskUpdate` with `status: "completed"`. If the call fails, retry once; if it still fails, stop and surface the error — do **not** tick the markdown checkbox, do **not** proceed to the next item. (See [`../_shared/builtin-plan-sync.md`](../_shared/builtin-plan-sync.md) for the rationale.)
+5. Change `- [ ]` to `- [x]` for this item in both `.issues/issue-{N}.plan.md` and `.issues/issue-{N}.md` (under `## Implementation Checklist`), in the same model response as step 4.
+5.5. Update `.issues/issue-{N}.tasks.json`: find the entry by `index` (checklist position, 0-based), set `status: "completed"`, update `lastUpdated` to the current ISO timestamp, write back.
 6. Call `issue_push` with the `.issues/` directory to sync all issues to GitHub.
 
 ## Subagent-Driven Execution
@@ -130,9 +119,9 @@ Dispatch a spec compliance reviewer using `spec-reviewer-prompt.md`. This verifi
 
 ### Step 5: Complete Item
 
-1. Mark the native task as `completed`.
-2. Update `.issues/issue-{N}.tasks.json`: find the entry by `index` (checklist position, 0-based), set `status: "completed"`, update `lastUpdated`, write back.
-3. Change `- [ ]` to `- [x]` for this item in both `.issues/issue-{N}.plan.md` and `.issues/issue-{N}.md` (under `## Implementation Checklist`).
+1. **Mark the native task `completed` BEFORE editing the markdown.** Call `TaskUpdate` with `status: "completed"`. If the call fails, retry once; if it still fails, stop and surface the error — do **not** tick the markdown checkbox. (See [`../_shared/builtin-plan-sync.md`](../_shared/builtin-plan-sync.md).)
+2. Change `- [ ]` to `- [x]` for this item in both `.issues/issue-{N}.plan.md` and `.issues/issue-{N}.md` (under `## Implementation Checklist`), in the same model response as step 1.
+3. Update `.issues/issue-{N}.tasks.json`: find the entry by `index` (checklist position, 0-based), set `status: "completed"`, update `lastUpdated`, write back.
 4. Call `issue_push` with the `.issues/` directory to sync all issues to GitHub.
 
 Then proceed to the next unchecked item.
@@ -210,7 +199,7 @@ For each returned branch, in the original checklist order:
 
 1. `git merge --no-ff <branch>` — keep a merge commit so the per-task work is visible in history. Do **not** rebase.
 2. Run the per-item **Spec Compliance Review** and then **Code Quality Review** (same prompts and iteration limit as Subagent-Driven Execution above). Reviews run in the issue worktree, not the (possibly already-cleaned) isolation worktree.
-3. **Only if both reviews pass:** tick `- [ ]` → `- [x]` in both `.issues/issue-{N}.plan.md` and `.issues/issue-{N}.md` (under `## Implementation Checklist`), call `issue_push` with the `.issues/` directory, mark the native task `completed`, and delete the merged branch with `git branch -d <branch>`.
+3. **Only if both reviews pass:** call `TaskUpdate` with `status: "completed"` FIRST (retry once on failure; stop and surface error if the retry fails — do not tick or merge). Then tick `- [ ]` → `- [x]` in both `.issues/issue-{N}.plan.md` and `.issues/issue-{N}.md` (under `## Implementation Checklist`), call `issue_push` with the `.issues/` directory, and delete the merged branch with `git branch -d <branch>`.
 4. If reviews fail, follow the existing review-iteration loop (max 3). Fixes happen in the issue worktree on top of the merge.
 
 Do **not** tick the checkbox before the per-item review passes — a merged-but-broken item would otherwise be recorded as done.
@@ -246,7 +235,7 @@ If a previous session was interrupted mid-checklist:
 - Re-create native tasks only for the remaining unchecked items — don't create tasks for already-completed work.
 - Re-derive `.issues/issue-{N}.plan.md` from the freshly pulled issue body (entry gate step 7) so the plan working file reflects current checked/unchecked state.
 
-This is the crash-recovery model: GitHub is the persistent state (what's checked is done; what's unchecked is pending). `.issues/issue-{N}.tasks.json` provides task subjects and prior statuses for fast `TaskCreate` re-population — use it when available (step 7.5), fall back to checklist parsing when absent.
+This is the crash-recovery model: GitHub is the persistent state (what's checked is done; what's unchecked is pending). `.issues/issue-{N}.tasks.json` provides task subjects and prior statuses for fast repopulation. The reconciliation procedure (normalization, cancelled orphans, missing-task fill) is documented in [`../_shared/builtin-plan-sync.md`](../_shared/builtin-plan-sync.md) — apply it on every resume.
 
 ## Pitfalls
 
