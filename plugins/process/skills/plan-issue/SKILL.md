@@ -8,6 +8,8 @@ description: "Use when breaking a specified issue into implementation tasks — 
 
 **Core principle:** The implementation checklist lives alongside the spec. GH mode appends it to the issue body; local mode appends it to `docs/specs/<slug>.md`. No separate plan files.
 
+> **Built-in plan sync:** this skill is exempt — it does not modify issue checklists. See [`../_shared/builtin-plan-sync.md`](../_shared/builtin-plan-sync.md). `execute-issue` creates the native task list on first run.
+
 ## Entry Gate
 
 Before doing any work, detect the **mode** and run the mode-specific gate.
@@ -61,36 +63,11 @@ Do not proceed past the entry gate unless all checks pass.
    - **GH mode with umbrella:** check if `#ISSUE_NUMBER` already appears in the umbrella's tasklist; if not, append `- [ ] #ISSUE_NUMBER`. Synced on next `issue_push`.
    - **Local mode with umbrella:** append `- [ ] docs/specs/<child>.md` to the umbrella file's tasklist (create one if missing).
 
-8. Create native Claude Code tasks via `TaskCreate` for session tracking — one task per checklist item.
-
-8.5. **Write tasks.json** — After all `TaskCreate` calls complete, capture each native task ID from the tool result (`task.id`). Write a tasks persistence file co-located with the spec:
-   - **GH mode:** `.issues/issue-{N}.tasks.json`
-   - **Local mode:** `docs/specs/<slug>.tasks.json`
-
-   Format:
-   ```json
-   {
-     "issueNumber": 42,
-     "specPath": ".issues/issue-42.md",
-     "tasks": [
-       {
-         "index": 0,
-         "subject": "Task 1: Create foo.ts with bar interface",
-         "status": "pending",
-         "nativeId": "<id from TaskCreate result>"
-       }
-     ],
-     "lastUpdated": "<ISO timestamp>"
-   }
-   ```
-
-   Omit `issueNumber` in local mode. `index` is 0-based and matches checklist order — it's the stable cross-session key. `nativeId` is session-scoped and will be refreshed on resume.
-
-9. **Transition status:**
+8. **Transition status:**
    - **GH mode:** call `issue_update` to remove `backlog` and `has-spec` labels and add `in-progress`.
    - **Local mode:** update the frontmatter `status: has-spec` → `status: in-progress`.
 
-10. Tell the user: "Checklist added to <issue #N | docs/specs/<slug>.md>. Run `execute-issue` to start implementation."
+9. Tell the user: "Checklist added to <issue #N | docs/specs/<slug>.md>. Run `execute-issue` to start implementation." `execute-issue` will create the native task list on first run.
 
 ## Checklist Format
 
@@ -119,9 +96,6 @@ Tasks should be concrete and file-level — "Create X in Y" or "Modify Z to add 
 **Problem:** Vague checklist items.
 **Fix:** Every item should name specific files and describe a concrete change.
 
-**Problem:** Forgetting native task creation or tasks.json.
-**Fix:** Call `TaskCreate` for each checklist item, then write tasks.json with the resulting IDs so execute-issue can resume without re-parsing the checklist.
-
 ## Red Flags
 
 **Never:**
@@ -135,8 +109,6 @@ Tasks should be concrete and file-level — "Create X in Y" or "Modify Z to add 
 - Explore the codebase first — patterns and locations matter
 - Name specific files in each task
 - Get user approval on the checklist before persisting
-- Create native tasks for session tracking
-- Write tasks.json with native IDs after all TaskCreate calls complete
 - Link to umbrella if one exists
 - Transition status after persisting
 
