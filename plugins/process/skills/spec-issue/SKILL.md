@@ -161,18 +161,31 @@ When the user says "check for feedback", "there's feedback on GitHub", or simila
 **Problem:** Presenting the spec to the user without running internal review.
 **Fix:** Always run the checklist gate + subagent review before transitioning status.
 
+**Problem:** Calling `AskUserQuestion` without surfacing the question in prose first.
+**Fix:** Output the question statement as user-facing prose immediately before the tool call (Rule 1).
+
+**Problem:** Offering only two or three options when four meaningful choices exist.
+**Fix:** Aim for four distinct `options`, recommended first with `"(Recommended)"` in its `label` (Rule 2). Fewer is acceptable only when more would be invented filler.
+
+**Problem:** Letting choice `description` text sprawl past two sentences.
+**Fix:** Cap each `description` at two sentences (Rule 3). Edit longer descriptions down rather than leaving them long.
+
 ## Red Flags
 
 **Never:**
 - Skip user approval on any section of the design
 - Proceed without the `needs-spec` status being present (label in GH mode, frontmatter in local mode)
 - Ask more than one question per message
+- Call `AskUserQuestion` without first emitting the question statement as prose
+- Let a choice `description` exceed two sentences
 - Start implementation — this skill ends when the spec is written
 - Write the spec in two places (e.g., both an issue body and a local file)
 
 **Always:**
 - Detect mode at the entry gate and announce which mode is active
 - Ask one question at a time
+- Emit the question as prose immediately before each `AskUserQuestion` call
+- Aim for four meaningful `options`, recommended first with `"(Recommended)"`
 - Run internal review (checklist gate + subagent) before transitioning status
 - Transition status after the spec is written
 - Tell the user what to run next (`plan-issue`)
